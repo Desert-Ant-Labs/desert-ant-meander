@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "AA0000000000000000000005"
-               BuildableName = "TravelPicks.app"
-               BlueprintName = "TravelPicks"
-               ReferencedContainer = "container:TravelPicks.xcodeproj">
+               BuildableName = "Meander.app"
+               BlueprintName = "Meander"
+               ReferencedContainer = "container:Meander.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "AA0000000000000000000005"
-            BuildableName = "TravelPicks.app"
-            BlueprintName = "TravelPicks"
-            ReferencedContainer = "container:TravelPicks.xcodeproj">
+            BuildableName = "Meander.app"
+            BlueprintName = "Meander"
+            ReferencedContainer = "container:Meander.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "AA0000000000000000000005"
-            BuildableName = "TravelPicks.app"
-            BlueprintName = "TravelPicks"
-            ReferencedContainer = "container:TravelPicks.xcodeproj">
+            BuildableName = "Meander.app"
+            BlueprintName = "Meander"
+            ReferencedContainer = "container:Meander.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

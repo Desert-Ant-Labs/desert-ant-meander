@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct TravelPicksApp: App {
+struct MeanderApp: App {
     @State private var library = PhotoLibrary()
     @State private var curator = Curator()
     @State private var store = TripStore()

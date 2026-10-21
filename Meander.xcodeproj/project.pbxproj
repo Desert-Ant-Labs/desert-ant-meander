@@ -11,13 +11,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		AA0000000000000000000004 /* TravelPicks.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TravelPicks.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000004 /* Meander.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Meander.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		AA0000000000000000000003 /* TravelPicks */ = {
+		AA0000000000000000000003 /* Meander */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = TravelPicks;
+			path = Meander;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -37,7 +37,7 @@
 		AA0000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
-				AA0000000000000000000003 /* TravelPicks */,
+				AA0000000000000000000003 /* Meander */,
 				AA0000000000000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -45,7 +45,7 @@
 		AA0000000000000000000002 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				AA0000000000000000000004 /* TravelPicks.app */,
+				AA0000000000000000000004 /* Meander.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -53,9 +53,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		AA0000000000000000000005 /* TravelPicks */ = {
+		AA0000000000000000000005 /* Meander */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = AA0000000000000000000020 /* Build configuration list for PBXNativeTarget "TravelPicks" */;
+			buildConfigurationList = AA0000000000000000000020 /* Build configuration list for PBXNativeTarget "Meander" */;
 			buildPhases = (
 				AA0000000000000000000011 /* Sources */,
 				AA0000000000000000000010 /* Frameworks */,
@@ -66,14 +66,14 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				AA0000000000000000000003 /* TravelPicks */,
+				AA0000000000000000000003 /* Meander */,
 			);
-			name = TravelPicks;
+			name = Meander;
 			packageProductDependencies = (
 				AA0000000000000000000041 /* Eye */,
 			);
-			productName = TravelPicks;
-			productReference = AA0000000000000000000004 /* TravelPicks.app */;
+			productName = Meander;
+			productReference = AA0000000000000000000004 /* Meander.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -91,7 +91,7 @@
 					};
 				};
 			};
-			buildConfigurationList = AA0000000000000000000021 /* Build configuration list for PBXProject "TravelPicks" */;
+			buildConfigurationList = AA0000000000000000000021 /* Build configuration list for PBXProject "Meander" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -108,7 +108,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				AA0000000000000000000005 /* TravelPicks */,
+				AA0000000000000000000005 /* Meander */,
 			);
 		};
 /* End PBXProject section */
@@ -233,7 +233,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		AA0000000000000000000020 /* Build configuration list for PBXNativeTarget "TravelPicks" */ = {
+		AA0000000000000000000020 /* Build configuration list for PBXNativeTarget "Meander" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AA0000000000000000000032 /* Debug */,
@@ -242,7 +242,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		AA0000000000000000000021 /* Build configuration list for PBXProject "TravelPicks" */ = {
+		AA0000000000000000000021 /* Build configuration list for PBXProject "Meander" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AA0000000000000000000030 /* Debug */,

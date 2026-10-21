@@ -2,7 +2,7 @@ import CoreLocation
 import Observation
 import Photos
 
-/// A trip the user has added to TravelPicks. It points at photos in the library; it does not copy them.
+/// A trip the user has added to Meander. It points at photos in the library; it does not copy them.
 struct SavedTrip: Identifiable, Codable, Hashable {
     struct Pin: Codable, Hashable, Identifiable {
         var name: String

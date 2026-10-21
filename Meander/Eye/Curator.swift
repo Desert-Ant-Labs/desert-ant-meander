@@ -3,7 +3,7 @@ import Observation
 import Photos
 
 /// Runs the model over trips, caches what it says, and remembers what you restore or discard.
-/// Nothing is ever deleted from Photos: discarding only hides an item inside TravelPicks.
+/// Nothing is ever deleted from Photos: discarding only hides an item inside Meander.
 @MainActor @Observable
 final class Curator {
     struct Progress: Equatable { var done: Int; var total: Int }

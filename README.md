@@ -1,10 +1,10 @@
-# TravelPicks
+# Meander
 
-An iOS app (SwiftUI, iOS 26) for turning trips into photo collections and printed books. You add trips from your Photos library; they show as cards, as pins on a map, and as books. Adding media opens the TravelPicks image picker, which sorts the library into trips, places, days and weeks and picks the best shots. The picker is built to run on the Eye image model, which is in beta. Until Eye ships, Apple's Vision framework stands in for it.
+An iOS app (SwiftUI, iOS 26) for turning trips into photo collections and printed books. You add trips from your Photos library; they show as cards, as pins on a map, and as books. Adding media opens the Meander image picker, which sorts the library into trips, places, days and weeks and picks the best shots. The picker is built to run on the Eye image model, which is in beta. Until Eye ships, Apple's Vision framework stands in for it.
 
 ## Run it
 
-Open `TravelPicks.xcodeproj`, choose your iPhone as the run destination, and press Run. Signing uses your Personal Team.
+Open `Meander.xcodeproj`, choose your iPhone as the run destination, and press Run. Signing uses your Personal Team.
 
 ## How it works
 
