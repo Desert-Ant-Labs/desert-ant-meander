@@ -1,0 +1,129 @@
+import Observation
+import Photos
+import PhotosUI
+import SwiftUI
+
+/// What the user has ticked in the picker, across every screen of it.
+@MainActor @Observable
+final class PickerSelection {
+    private(set) var items: [MediaItem] = []
+    private var ids: Set<String> = []
+
+    var count: Int { items.count }
+
+    func contains(_ item: MediaItem) -> Bool { ids.contains(item.id) }
+
+    func toggle(_ item: MediaItem) {
+        if ids.remove(item.id) != nil {
+            items.removeAll { $0.id == item.id }
+        } else {
+            ids.insert(item.id)
+            items.append(item)
+        }
+    }
+
+    func add(_ new: [MediaItem]) {
+        for item in new where ids.insert(item.id).inserted { items.append(item) }
+    }
+
+    func remove(_ old: [MediaItem]) {
+        let gone = Set(old.map(\.id))
+        ids.subtract(gone)
+        items.removeAll { gone.contains($0.id) }
+    }
+}
+
+enum Route: Hashable {
+    case trip(String)
+    case scope(MediaScope)
+    case discarded(MediaScope)
+}
+
+/// The image picker: browse the library by trip, place, day or week, with Eye's curation,
+/// tick what you want, and hand it back.
+struct MediaPicker: View {
+    @Environment(PhotoLibrary.self) private var library
+    @Environment(Curator.self) private var curator
+    @Environment(\.dismiss) private var dismiss
+    @State private var selection = PickerSelection()
+    @State private var showsSystemPicker = false
+    @State private var systemPicks: [PhotosPickerItem] = []
+
+    /// IDs already in the trip being added to. They show as added and can't be picked twice.
+    var alreadyAdded: Set<String> = []
+    /// The new trip being filled, when there is one. Library trips from its place are listed first.
+    var focus: TripDraft?
+    let onAdd: ([MediaItem]) -> Void
+
+    var body: some View {
+        NavigationStack {
+            PickerTripsView()
+                .navigationDestination(for: Route.self) { route in
+                    switch route {
+                    case .trip(let id): TripView(tripID: id)
+                    case .scope(let scope): MediaGridView(scope: scope)
+                    case .discarded(let scope): DiscardedView(scope: scope)
+                    }
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel", systemImage: "xmark") { dismiss() }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("All Photos", systemImage: "photo.on.rectangle") { showsSystemPicker = true }
+                    }
+                }
+                // The system photo picker, for anything the trips don't cover.
+                // What is chosen there joins the same selection as everything ticked here.
+                .photosPicker(
+                    isPresented: $showsSystemPicker,
+                    selection: $systemPicks,
+                    matching: .any(of: [.images, .videos]),
+                    photoLibrary: .shared()
+                )
+                .onChange(of: systemPicks) { _, picks in
+                    guard !picks.isEmpty else { return }
+                    let ids = picks.compactMap(\.itemIdentifier)
+                    var items: [MediaItem] = []
+                    PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil).enumerateObjects { asset, _, _ in
+                        if !alreadyAdded.contains(asset.localIdentifier) { items.append(MediaItem(asset: asset)) }
+                    }
+                    selection.add(items)
+                    systemPicks = []
+                }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if selection.count > 0 {
+                Button {
+                    onAdd(selection.items)
+                    dismiss()
+                } label: {
+                    Text("Add \(selection.count) \(noun(for: selection.items))")
+                        .font(.text(.headline, weight: .semibold))
+                        .foregroundStyle(Color.canvas)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                }
+                .buttonStyle(.glassProminent)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: selection.count > 0)
+        .environment(selection)
+        .environment(\.alreadyAdded, alreadyAdded)
+        .environment(\.pickerFocus, focus)
+        .task {
+            await library.start()
+            if library.access == .full || library.access == .limited {
+                curator.curateLibrary(first: library.trips.filter(\.isPossible).flatMap(\.items))
+            }
+        }
+    }
+}
+
+extension EnvironmentValues {
+    @Entry var alreadyAdded: Set<String> = []
+    @Entry var pickerFocus: TripDraft?
+}

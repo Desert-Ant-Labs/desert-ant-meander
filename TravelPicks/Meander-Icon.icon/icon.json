@@ -1,0 +1,51 @@
+{
+  "fill": {
+    "solid": "display-p3:0.98824,0.98039,0.92549,1.00000"
+  },
+  "groups": [
+    {
+      "blur-material": null,
+      "layers": [
+        {
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "srgb:0.22353,0.24706,0.27059,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:0.98824,0.98039,0.92549,1.00000"
+              }
+            }
+          ],
+          "glass": true,
+          "image-name": "meander-m 2.svg",
+          "name": "meander-m 2"
+        }
+      ],
+      "position": {
+        "scale": 5.1,
+        "translation-in-points": [
+          0,
+          0
+        ]
+      },
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.1
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
+      "watchOS"
+    ],
+    "squares": "shared"
+  }
+}
