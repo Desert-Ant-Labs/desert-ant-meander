@@ -278,43 +278,44 @@ private struct LoadingTrips: View {
                 .shimmer()
                 .padding(.horizontal)
 
-            Group {
-                Text("Trips").font(.heading(.title2))
-                    .padding(.horizontal)
+            Text("Trips").font(.heading(.title2))
+                .padding(.horizontal)
+            // Laid out like the real row: it runs off the right edge without widening the screen.
+            ScrollView(.horizontal) {
                 HStack(spacing: 12) {
                     ForEach(0..<2, id: \.self) { _ in
                         RoundedRectangle(cornerRadius: 24).fill(Color.surface).frame(width: 260, height: 200)
                     }
                 }
                 .padding(.horizontal)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .clipped()
-
-                Text("Curated Trips").font(.heading(.title2))
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                VStack(spacing: 10) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        HStack(spacing: 14) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Capsule().fill(.fill.secondary).frame(width: 150, height: 14)
-                                Capsule().fill(.fill.tertiary).frame(width: 100, height: 10)
-                            }
-                            Spacer()
-                            RoundedRectangle(cornerRadius: 12).fill(.fill.tertiary).frame(width: 84, height: 84)
-                        }
-                        .padding(12)
-                        .padding(.leading, 4)
-                        .background(Color.surface, in: .rect(cornerRadius: 20))
-                    }
-                }
-                .padding(.horizontal)
             }
-            .redacted(reason: .placeholder)
+            .scrollDisabled(true)
+            .scrollIndicators(.hidden)
+            .opacity(dim ? 0.5 : 1)
+
+            Text("Curated Trips").font(.heading(.title2))
+                .padding(.horizontal)
+                .padding(.top, 8)
+            VStack(spacing: 10) {
+                ForEach(0..<3, id: \.self) { _ in
+                    HStack(spacing: 14) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Capsule().fill(.fill.secondary).frame(width: 150, height: 14)
+                            Capsule().fill(.fill.tertiary).frame(width: 100, height: 10)
+                        }
+                        Spacer()
+                        RoundedRectangle(cornerRadius: 12).fill(.fill.tertiary).frame(width: 84, height: 84)
+                    }
+                    .padding(12)
+                    .padding(.leading, 4)
+                    .background(Color.surface, in: .rect(cornerRadius: 20))
+                }
+            }
+            .padding(.horizontal)
             .opacity(dim ? 0.5 : 1)
         }
         .padding(.top, 8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
             withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { dim = true }
         }
