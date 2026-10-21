@@ -3,7 +3,7 @@ import Photos
 import PhotosUI
 import SwiftUI
 
-/// What the user has ticked in the picker, across every screen of it.
+/// What the user has ticked in the picker, across every screen of it, in the order it was ticked.
 @MainActor @Observable
 final class PickerSelection {
     private(set) var items: [MediaItem] = []
@@ -84,11 +84,12 @@ struct MediaPicker: View {
                 .onChange(of: systemPicks) { _, picks in
                     guard !picks.isEmpty else { return }
                     let ids = picks.compactMap(\.itemIdentifier)
-                    var items: [MediaItem] = []
+                    var found: [String: MediaItem] = [:]
                     PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil).enumerateObjects { asset, _, _ in
-                        if !alreadyAdded.contains(asset.localIdentifier) { items.append(MediaItem(asset: asset)) }
+                        if !alreadyAdded.contains(asset.localIdentifier) { found[asset.localIdentifier] = MediaItem(asset: asset) }
                     }
-                    selection.add(items)
+                    // In the order they were chosen; the fetch doesn't keep it.
+                    selection.add(ids.compactMap { found[$0] })
                     systemPicks = []
                 }
         }

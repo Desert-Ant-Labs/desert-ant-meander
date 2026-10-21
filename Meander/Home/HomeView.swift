@@ -11,13 +11,14 @@ enum PickerTarget: Identifiable, Hashable {
     case newTrip
     /// Picking media for a new trip that has been named.
     case draft(TripDraft)
-    case trip(UUID)
+    /// Adding to an album that exists, at a place in it.
+    case trip(UUID, MediaPosition)
 
     var id: String {
         switch self {
         case .newTrip: "new"
         case .draft(let draft): "draft-\(draft.title)"
-        case .trip(let id): id.uuidString
+        case .trip(let id, _): id.uuidString
         }
     }
 }
@@ -124,7 +125,7 @@ struct HomeView: View {
             }
             .navigationDestination(for: HomeRoute.self) { route in
                 switch route {
-                case .trip(let id): TripStoryView(tripID: id) { picker = .trip(id) }
+                case .trip(let id): TripStoryView(tripID: id) { position in picker = .trip(id, position) }
                 case .book(let id): BookView(tripID: id)
                 }
             }
@@ -151,7 +152,8 @@ private struct PickerSheet: View {
     var body: some View {
         var tripID: UUID?
         var draft: TripDraft?
-        if case .trip(let id) = target { tripID = id }
+        var position = MediaPosition.end
+        if case .trip(let id, let at) = target { tripID = id; position = at }
         if case .draft(let named) = target { draft = named }
         let existing = tripID.flatMap(store.trip)
 
@@ -163,7 +165,7 @@ private struct PickerSheet: View {
             if pins.isEmpty, let draft, let coordinate = draft.coordinate {
                 pins = [SavedTrip.Pin(name: draft.title, latitude: coordinate.latitude, longitude: coordinate.longitude)]
             }
-            onDone(store.add(items, title: draft?.title ?? described.title, pins: pins, to: tripID))
+            onDone(store.add(items, title: draft?.title ?? described.title, pins: pins, to: tripID, at: position))
         }
     }
 }

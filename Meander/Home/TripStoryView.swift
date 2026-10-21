@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// An album, shown as a map of its route and then its highlights and journal entries in time order,
+/// An album, shown as a map of its route and then its highlights and journal entries in album order,
 /// a screen at a time, with a line per screen that fills when its screen shows.
 /// Landscape and square photos share a screen, one above the other.
 /// Tap the right or left side to step; it also advances on its own.
@@ -8,7 +8,8 @@ struct TripStoryView: View {
     @Environment(TripStore.self) private var store
     @Environment(Curator.self) private var curator
     let tripID: UUID
-    let onAddMedia: () -> Void
+    /// Opens the picker. What's picked goes in at the given place.
+    let onAddMedia: (MediaPosition) -> Void
 
     @State private var index = 0
     /// One screen of the story.
@@ -81,7 +82,7 @@ struct TripStoryView: View {
                     ContentUnavailableView {
                         Label("Nothing in this album yet", systemImage: "photo.on.rectangle")
                     } actions: {
-                        Button("Add Media", action: onAddMedia)
+                        Button("Add Media") { onAddMedia(.end) }
                             .buttonStyle(.glass)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -129,10 +130,12 @@ struct TripStoryView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu("Add", systemImage: "plus") {
-                        Button("Photos and Videos", systemImage: "photo.on.rectangle", action: onAddMedia)
+                        Button("Photos and Videos", systemImage: "photo.on.rectangle") {
+                            onAddMedia(mediaPosition(at: index, in: slides, highlights: highlights))
+                        }
                         Button("Journal Entry", systemImage: "square.and.pencil") {
                             editingIsNew = true
-                            editing = JournalNote(text: "", date: noteDate(after: current, in: trip))
+                            editing = JournalNote(text: "", date: noteDate(after: current, in: trip), place: notePlace(after: current))
                         }
                     }
                 }
@@ -202,7 +205,7 @@ struct TripStoryView: View {
         }
     }
 
-    /// Eye's top picks from the trip, back in the order they were taken.
+    /// Eye's top picks from the trip, back in album order.
     /// Up to ten places go to videos first, so adding a video always shows; photos fill the rest.
     private func highlights(of trip: SavedTrip) -> [MediaItem] {
         let items = store.items(for: trip)
@@ -210,28 +213,48 @@ struct TripStoryView: View {
         let ranked = items.sorted { curator.score($0) > curator.score($1) }
         let videos = ranked.filter(\.isVideo).prefix(Self.videoPlaces)
         let photos = ranked.filter { !$0.isVideo }.prefix(Self.highlightCount - videos.count)
-        return (videos + photos).sorted { $0.date < $1.date }
+        let picked = Set((videos + photos).map(\.id))
+        return items.filter { picked.contains($0.id) }
     }
 
-    /// The map, then photo screens and journal entries in time order. An entry comes after
-    /// every screen whose first photo was taken at or before the entry's date.
+    /// The map, then photo screens in album order, each followed by the journal entries that follow its photos.
     private func makeSlides(_ trip: SavedTrip, highlights: [MediaItem], hasMap: Bool) -> [Slide] {
         let frames = StoryFrame.frames(for: highlights, shapes: shapes ?? [:])
+        let notes = store.placeNotes(in: trip, among: highlights)
         var slides: [Slide] = hasMap ? [.map] : []
-        var notes = trip.notes.sorted { $0.date < $1.date }[...]
+        slides += notes.opening.map(Slide.note)
         for frame in frames {
-            while let note = notes.first, note.date < frame[0].date {
-                slides.append(.note(note))
-                notes.removeFirst()
-            }
             slides.append(.media(frame))
+            for item in frame { slides += notes.after[item.id, default: []].map(Slide.note) }
         }
-        slides += notes.map(Slide.note)
         return slides
     }
 
-    /// A new entry is dated just after what's on screen, so it appears right after it;
-    /// from the map, just before the first photo, so it opens the album.
+    /// Media added from a screen goes after the last photo shown up to and including it;
+    /// from the map, at the start.
+    private func mediaPosition(at index: Int, in slides: [Slide], highlights: [MediaItem]) -> MediaPosition {
+        guard !slides.isEmpty else { return .end }
+        for slide in slides[...min(index, slides.count - 1)].reversed() {
+            if case .media(let frame) = slide,
+               let last = highlights.last(where: { frame.contains($0) }) {
+                return .after(last.id)
+            }
+        }
+        return .start
+    }
+
+    /// A new entry follows what's on screen: the first photo of a photo screen, or the same photo
+    /// as the entry on screen. From the map it opens the album.
+    private func notePlace(after slide: Slide?) -> JournalNote.Place {
+        switch slide {
+        case .media(let items): .after(items[0].id)
+        case .note(let note): note.place
+        case .map, nil: .start
+        }
+    }
+
+    /// A new entry is dated just after what's on screen, so it comes after other entries in the same place;
+    /// from the map, just before the first photo.
     private func noteDate(after slide: Slide?, in trip: SavedTrip) -> Date {
         switch slide {
         case .media(let items): items.map(\.date).max()!.addingTimeInterval(1)

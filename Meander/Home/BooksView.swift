@@ -172,17 +172,19 @@ struct BookView: View {
         }
     }
 
-    /// Photos and journal entries in time order. Videos are left out of print.
+    /// Photos in album order, each followed by the journal entries that follow it. Videos are left out of print.
     private func entries(_ trip: SavedTrip, photos: [MediaItem]) -> [BookLayout.Entry] {
-        let photoEntries = photos.map { item in
-            (item.date, BookLayout.Entry.photo(BookPhoto(
+        let notes = store.placeNotes(in: trip, among: photos)
+        var entries = notes.opening.map(BookLayout.Entry.note)
+        for item in photos {
+            entries.append(.photo(BookPhoto(
                 item: item,
                 aspect: StoryFrame.aspect(item, shapes),
                 place: BookLayout.place(of: item, pins: trip.pins)
             )))
+            entries += notes.after[item.id, default: []].map(BookLayout.Entry.note)
         }
-        let noteEntries = trip.notes.map { ($0.date, BookLayout.Entry.note($0)) }
-        return (photoEntries + noteEntries).sorted { $0.0 < $1.0 }.map(\.1)
+        return entries
     }
 }
 
