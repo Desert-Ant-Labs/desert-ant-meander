@@ -181,7 +181,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = HK42MBARG3;
+				DEVELOPMENT_TEAM = Q32R58ALD2;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Meander;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Meander saves the picks you choose into an album in Photos.";
@@ -194,7 +194,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.laurenwaller.TravelPicks;
+				PRODUCT_BUNDLE_IDENTIFIER = com.laurenwaller.da.TravelPicks;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -209,7 +209,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = HK42MBARG3;
+				DEVELOPMENT_TEAM = Q32R58ALD2;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Meander;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Meander saves the picks you choose into an album in Photos.";
@@ -222,7 +222,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.laurenwaller.TravelPicks;
+				PRODUCT_BUNDLE_IDENTIFIER = com.laurenwaller.da.TravelPicks;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -261,6 +261,8 @@
 				kind = upToNextMajorVersion;
 				minimumVersion = 4.0.0;
 			};
+			traits = (
+			);
 		};
 /* End XCRemoteSwiftPackageReference section */
 
