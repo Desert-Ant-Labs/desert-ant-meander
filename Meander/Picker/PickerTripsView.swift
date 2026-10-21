@@ -9,6 +9,7 @@ struct PickerTripsView: View {
 
     var body: some View {
         content
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .canvas()
             .barTitle("Add Media")
     }
@@ -17,7 +18,7 @@ struct PickerTripsView: View {
     private var content: some View {
         switch library.access {
         case .unknown:
-            ProgressView()
+            LoadingTrips()
         case .denied:
             ContentUnavailableView {
                 Label("Allow access to Photos", systemImage: "photo.on.rectangle.angled")
@@ -34,12 +35,12 @@ struct PickerTripsView: View {
         case .full, .limited:
             if library.trips.isEmpty {
                 if library.isLoading {
-                    ProgressView("Looking for trips")
+                    LoadingTrips()
                 } else {
                     ContentUnavailableView {
                         Label("No trips yet", systemImage: "airplane")
                     } description: {
-                        Text("A trip is a run of photos taken more than 60km from home. Photos need location data to count.")
+                        Text("Trips are found from where and when your photos were taken: days away from home, or busy days with many more photos than usual.")
                     } actions: {
                         if library.access == .limited {
                             Button("Choose More Photos") { library.manageLimitedSelection() }
@@ -150,7 +151,8 @@ private struct PossibleTripRow: View {
                         Label("\(signal.nature) nature \(signal.nature == 1 ? "photo" : "photos") \u{00B7} \(trip.items.count) in all",
                               systemImage: "mountain.2")
                     } else {
-                        Label("Eye is looking \u{00B7} \(trip.items.count) photos", systemImage: "sparkles")
+                        Label("Eye is looking\u{2026} \u{00B7} \(trip.items.count) photos", systemImage: "sparkles")
+                            .shimmer()
                     }
                 }
                 .font(.text(.caption))
@@ -250,7 +252,7 @@ private struct EyeStatus: View {
     private func row(_ title: String, detail: String, value: Double, footnote: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(title).font(.text(.footnote, weight: .semibold))
+                Text(title).font(.text(.footnote, weight: .semibold)).shimmer()
                 Spacer()
                 Text(detail).font(.text(.footnote)).foregroundStyle(.secondary).monospacedDigit()
             }
@@ -261,5 +263,62 @@ private struct EyeStatus: View {
         }
         .padding()
         .background(Color.surface, in: .rect(cornerRadius: 16))
+    }
+}
+
+/// While trips are being found: the shape of the screen to come, in placeholder grey, gently pulsing.
+private struct LoadingTrips: View {
+    @State private var dim = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Finding trips in your photos\u{2026}", systemImage: "sparkles")
+                .font(.text(.footnote, weight: .medium))
+                .foregroundStyle(.secondary)
+                .shimmer()
+                .padding(.horizontal)
+
+            Group {
+                Text("Trips").font(.heading(.title2))
+                    .padding(.horizontal)
+                HStack(spacing: 12) {
+                    ForEach(0..<2, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 24).fill(Color.surface).frame(width: 260, height: 200)
+                    }
+                }
+                .padding(.horizontal)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .clipped()
+
+                Text("Curated Trips").font(.heading(.title2))
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                VStack(spacing: 10) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        HStack(spacing: 14) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Capsule().fill(.fill.secondary).frame(width: 150, height: 14)
+                                Capsule().fill(.fill.tertiary).frame(width: 100, height: 10)
+                            }
+                            Spacer()
+                            RoundedRectangle(cornerRadius: 12).fill(.fill.tertiary).frame(width: 84, height: 84)
+                        }
+                        .padding(12)
+                        .padding(.leading, 4)
+                        .background(Color.surface, in: .rect(cornerRadius: 20))
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .redacted(reason: .placeholder)
+            .opacity(dim ? 0.5 : 1)
+        }
+        .padding(.top, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { dim = true }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Finding trips in your photos")
     }
 }

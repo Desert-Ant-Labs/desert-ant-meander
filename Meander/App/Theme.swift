@@ -130,3 +130,43 @@ enum Theme {
         segmented.setTitleTextAttributes([.foregroundColor: canvas, .font: font], for: .selected)
     }
 }
+
+/// A soft band of light sweeping across, left to right, for text that means "working on it".
+/// Held still when Reduce Motion is on.
+struct Shimmer: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private static let period = 1.6
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content
+        } else {
+            content
+                .opacity(0.7)
+                .overlay {
+                    // Driven by the clock so it runs anywhere, including inside lazy lists.
+                    TimelineView(.animation) { timeline in
+                        let t = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: Self.period) / Self.period
+                        let phase = -0.3 + 1.6 * t
+                        // The band in the full text colour, so it shows even on faint secondary text.
+                        content
+                            .foregroundStyle(Color.ink)
+                            .mask {
+                                LinearGradient(
+                                    stops: [.init(color: .clear, location: phase - 0.3),
+                                            .init(color: .black, location: phase),
+                                            .init(color: .clear, location: phase + 0.3)],
+                                    startPoint: .leading, endPoint: .trailing
+                                )
+                            }
+                    }
+                }
+        }
+    }
+}
+
+extension View {
+    func shimmer(_ active: Bool = true) -> some View {
+        Group { if active { modifier(Shimmer()) } else { self } }
+    }
+}
