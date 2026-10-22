@@ -8,35 +8,42 @@ import Foundation
 /// do not change.
 struct EyeAnalysis: Codable, Hashable, Sendable {
     var tags: Set<EyeTag>
-    /// 0 to 1. Higher is a better shot. Used to rank and to pick "Best of".
+    /// 0 to 1. Higher is a better shot. Used to rank and to pick highlights.
     var score: Double
     var discard: DiscardReason?
 }
 
+/// The picker's filters. A photo can be in several.
 enum EyeTag: String, Codable, CaseIterable, Identifiable, Sendable {
-    case sights, selfies, landscapes, people, food, temples
+    /// Oceans, mountains, beaches and other nature.
+    case landscape
+    /// Sunrises and sunsets.
+    case goldenHour
+    /// Selfies and posed shots of people.
+    case people
+    case food
+    /// Buildings, ruins, temples and churches, markets, restaurants and city life.
+    case sights
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .sights: "Sights"
-        case .selfies: "Selfies"
-        case .landscapes: "Landscapes"
+        case .landscape: "Landscape"
+        case .goldenHour: "Golden Hour"
         case .people: "People"
         case .food: "Food"
-        case .temples: "Temples"
+        case .sights: "Sights"
         }
     }
 
     var symbol: String {
         switch self {
-        case .sights: "building.columns"
-        case .selfies: "person.crop.square"
-        case .landscapes: "mountain.2"
+        case .landscape: "mountain.2"
+        case .goldenHour: "sun.horizon"
         case .people: "person.2"
         case .food: "fork.knife"
-        case .temples: "sparkles"
+        case .sights: "building.columns"
         }
     }
 }

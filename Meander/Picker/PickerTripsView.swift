@@ -239,7 +239,7 @@ private struct EyeStatus: View {
                 row("Curating photos",
                     detail: "\(pass.batchDone.formatted()) of \(pass.batchTotal.formatted())",
                     value: Double(pass.batchDone) / Double(max(pass.batchTotal, 1)),
-                    footnote: "\(pass.curated.formatted()) of \(pass.total.formatted()) photos curated")
+                    footnote: "\(pass.curated.formatted()) of \(pass.total.formatted()) photos and videos curated")
             } else if curator.modelState == .unavailable {
                 Label("Eye couldn\u{2019}t download. Using on-device sorting for now.", systemImage: "wifi.slash")
                     .font(.text(.footnote))

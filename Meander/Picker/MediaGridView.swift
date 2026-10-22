@@ -7,7 +7,7 @@ struct MediaGridView: View {
     }
 
     enum Filter: Hashable {
-        case all, best, tag(EyeTag)
+        case all, highlights, tag(EyeTag)
     }
 
     @Environment(Curator.self) private var curator
@@ -34,7 +34,7 @@ struct MediaGridView: View {
         let items: [MediaItem]
         switch filter {
         case .all: items = ofKind
-        case .best: return curator.bestOf(ofKind)
+        case .highlights: items = curator.highlights(ofKind)
         case .tag(let tag): items = ofKind.filter { curator.tags($0).contains(tag) }
         }
         return rankByEye ? items.sorted { curator.score($0) > curator.score($1) } : items
@@ -89,7 +89,7 @@ struct MediaGridView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 Chip(title: "All", isOn: filter == .all) { filter = .all }
-                Chip(title: "Best of", symbol: "star", isOn: filter == .best) { filter = .best }
+                Chip(title: "Highlights", symbol: "star", isOn: filter == .highlights) { filter = .highlights }
                 ForEach(availableTags) { tag in
                     Chip(title: tag.title, symbol: tag.symbol, isOn: filter == .tag(tag)) { filter = .tag(tag) }
                 }

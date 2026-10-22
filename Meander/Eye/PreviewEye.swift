@@ -9,7 +9,7 @@ import Vision
 /// has real, if rougher, results to show. Every request is optional: if Vision is not
 /// available (some simulators), the pixel measurements and Photos metadata still work.
 struct PreviewEye: EyeModel {
-    let version = "preview-1"
+    let version = "preview-2"
 
     func analyze(_ items: [MediaItem], progress: @escaping @Sendable (Int) -> Void) async -> [String: EyeAnalysis] {
         let selfies = Self.selfieIDs()
@@ -56,7 +56,7 @@ struct PreviewEye: EyeModel {
 
     private static func measure(_ item: MediaItem, isSelfie: Bool) async -> Measurement {
         let asset = item.asset
-        var tags: Set<EyeTag> = isSelfie ? [.selfies, .people] : []
+        var tags: Set<EyeTag> = isSelfie ? [.people] : []
         var discard: DiscardReason?
 
         if asset.mediaSubtypes.contains(.photoScreenshot) { discard = .accidental }
@@ -79,7 +79,8 @@ struct PreviewEye: EyeModel {
         var closedEyes = false
         if let faces = try? await DetectFaceLandmarksRequest().perform(on: image.cgImage, orientation: orientation) {
             let prominent = faces.filter { $0.boundingBox.width * $0.boundingBox.height > 0.01 }
-            if !prominent.isEmpty { tags.insert(.people) }
+            // A face this big is someone posing for the shot, not a passer-by.
+            if prominent.contains(where: { $0.boundingBox.width * $0.boundingBox.height > 0.03 }) { tags.insert(.people) }
             closedEyes = prominent.contains { face in
                 guard let landmarks = face.landmarks else { return false }
                 return openness(landmarks.leftEye.points) < 0.14 && openness(landmarks.rightEye.points) < 0.14
@@ -137,15 +138,15 @@ struct PreviewEye: EyeModel {
     }
 
     private static let keywords: [EyeTag: [String]] = [
-        .food: ["food", "dish", "meal", "dessert", "fruit", "drink", "beverage", "coffee", "noodle", "rice", "soup",
-                "sushi", "pizza", "bread", "cake", "salad", "seafood", "meat", "vegetable", "snack", "breakfast", "curry"],
-        .temples: ["temple", "shrine", "pagoda", "stupa", "church", "cathedral", "mosque", "religious", "buddha",
-                   "monastery", "altar", "chapel"],
-        .landscapes: ["landscape", "mountain", "beach", "shore", "ocean", "sea", "lake", "river", "waterfall", "forest",
-                      "jungle", "desert", "sunset", "sunrise", "canyon", "valley", "island", "hill", "cliff", "coast",
-                      "volcano", "glacier", "field"],
+        .food: ["food", "dish", "meal", "dessert", "fruit", "noodle", "rice", "soup", "sushi", "pizza", "bread", "cake",
+                "salad", "seafood", "meat", "vegetable", "snack", "breakfast", "curry"],
+        .landscape: ["landscape", "mountain", "beach", "shore", "ocean", "sea", "lake", "river", "waterfall", "forest",
+                     "jungle", "desert", "canyon", "valley", "island", "hill", "cliff", "coast", "volcano", "glacier", "field"],
+        .goldenHour: ["sunset", "sunrise"],
         .sights: ["monument", "statue", "tower", "bridge", "castle", "palace", "architecture", "skyscraper", "cityscape",
-                  "landmark", "museum", "fountain", "structure", "building", "market", "street", "skyline"],
+                  "landmark", "museum", "fountain", "structure", "building", "market", "street", "skyline", "ruins",
+                  "temple", "shrine", "pagoda", "stupa", "church", "cathedral", "mosque", "religious", "monastery",
+                  "chapel", "restaurant", "cafe", "bazaar"],
     ]
 }
 

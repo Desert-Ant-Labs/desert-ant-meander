@@ -96,7 +96,7 @@ final class Curator {
         await modelReady?.value
     }
 
-    /// Runs Eye over the whole library, newest photos first, in batches of 1,000, skipping anything
+    /// Runs Eye over the whole library, newest first, in batches of 1,000, skipping anything
     /// already done. Starts when the picker opens and keeps going in the background; results are
     /// saved as it goes, so a later pass picks up where this one stopped.
     /// `first` jumps the queue: the photos in possible trips, so Eye can judge those soonest.
@@ -107,7 +107,7 @@ final class Curator {
             let library = Self.libraryNewestFirst()
             let firstIDs = Set(first.map(\.id))
             let rest = library.filter { !firstIDs.contains($0.id) }
-            let pending = (first.filter { !$0.isVideo } + rest).filter { analyses[$0.id] == nil }
+            let pending = (first + rest).filter { analyses[$0.id] == nil }
             libraryPass = LibraryPass(batchDone: 0, batchTotal: 0, curated: library.count - pending.count, total: library.count)
             let batches = stride(from: 0, to: pending.count, by: Self.batchSize).map {
                 Array(pending[$0..<min($0 + Self.batchSize, pending.count)])
@@ -136,11 +136,12 @@ final class Curator {
         }
     }
 
-    /// Every photo in the library, newest first. Videos are left for the trip pass.
+    /// Every photo and video in the library, newest first.
     nonisolated private static func libraryNewestFirst() -> [MediaItem] {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        options.predicate = NSPredicate(format: "mediaType == %d OR mediaType == %d",
+                                        PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue)
         var items: [MediaItem] = []
         PHAsset.fetchAssets(with: options).enumerateObjects { asset, _, _ in items.append(MediaItem(asset: asset)) }
         return items
@@ -176,23 +177,57 @@ final class Curator {
         var looksLikeTravel: Bool { share >= 0.1 }
     }
 
-    /// Eye's best landscape or nature photo among `items`, if it has found one.
+    /// Eye's best landscape or golden hour photo among `items`, if it has found one.
     func natureCover(_ items: [MediaItem]) -> MediaItem? {
-        kept(items).filter { !$0.isVideo && tags($0).contains(.landscapes) }.max { score($0) < score($1) }
+        kept(items).filter { !$0.isVideo && isNature(tags($0)) }.max { score($0) < score($1) }
     }
+
+    private func isNature(_ tags: Set<EyeTag>) -> Bool { tags.contains(.landscape) || tags.contains(.goldenHour) }
 
     func travelSignal(_ items: [MediaItem]) -> TravelSignal {
         let photos = items.filter { !$0.isVideo }
         let seen = photos.compactMap { analyses[$0.id] }
-        return TravelSignal(photos: photos.count, seen: seen.count, nature: seen.filter { $0.tags.contains(.landscapes) }.count)
+        return TravelSignal(photos: photos.count, seen: seen.count, nature: seen.filter { isNature($0.tags) }.count)
     }
 
     func discarded(_ items: [MediaItem]) -> [MediaItem] { items.filter(isDiscarded) }
 
-    /// The top fifth of what is kept, ranked by score. At least one item when anything is kept.
-    func bestOf(_ items: [MediaItem]) -> [MediaItem] {
+    /// Good shots from across the filters, in the order given:
+    /// - From each filter, and from photos in none, the best-scored `share`: at least one, at most `perTag`.
+    /// - Within each, nothing taken within `apart` of a shot already picked, so each covers its own moment.
+    /// - Videos are picked on their own, a couple per filter at most, since a video's score comes from one
+    ///   frame and would otherwise crowd out the photos. With only videos to choose from, they get the full share.
+    /// - Your favorites in Photos are always in.
+    func highlights(_ items: [MediaItem], share: Double = 0.3, perTag: Int = 15, videosPerTag: Int = 2,
+                    apart: TimeInterval = 5 * 60) -> [MediaItem] {
         let ranked = kept(items).filter { analyses[$0.id] != nil }.sorted { score($0) > score($1) }
-        return Array(ranked.prefix(max(1, Int((Double(ranked.count) * 0.2).rounded()))))
+        let photos = ranked.filter { !$0.isVideo }
+        let videos = ranked.filter(\.isVideo)
+
+        func pick(_ pool: [MediaItem], cap: Int) -> [MediaItem] {
+            let quota = min(cap, max(1, Int((Double(pool.count) * share).rounded())))
+            var chosen: [MediaItem] = []
+            for item in pool where chosen.count < quota {
+                if chosen.contains(where: { abs($0.date.timeIntervalSince(item.date)) < apart }) { continue }
+                chosen.append(item)
+            }
+            return chosen
+        }
+
+        // Each filter, then the photos no filter claimed.
+        let buckets: [(MediaItem) -> Bool] = EyeTag.allCases.map { tag in { self.tags($0).contains(tag) } }
+            + [{ self.tags($0).isEmpty }]
+        var picked: Set<String> = []
+        for inBucket in buckets {
+            let bucketPhotos = photos.filter(inBucket)
+            let bucketVideos = videos.filter(inBucket)
+            if !bucketPhotos.isEmpty { picked.formUnion(pick(bucketPhotos, cap: perTag).map(\.id)) }
+            if !bucketVideos.isEmpty {
+                picked.formUnion(pick(bucketVideos, cap: photos.isEmpty ? perTag : videosPerTag).map(\.id))
+            }
+        }
+        picked.formUnion(kept(items).filter { $0.asset.isFavorite }.map(\.id))
+        return items.filter { picked.contains($0.id) }
     }
 
     /// The photo that stands for a set: the best one once analyzed, a favorite or the middle one before.
