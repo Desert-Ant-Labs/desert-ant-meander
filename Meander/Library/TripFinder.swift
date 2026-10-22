@@ -3,14 +3,21 @@ import Foundation
 
 /// Finds trips in a library, two ways.
 ///
-/// By place: runs of photos taken far from home. A trip ends at the first photo taken back home,
-/// or after a week with no photos away.
+/// By place: runs of photos taken far from home. A trip ends once you're back home, meaning a photo
+/// taken at home with no photo away in the two days after it, or after a week with no photos away.
+/// A stray photo located at home mid-trip (one someone sent you, say) doesn't end it, as long as the
+/// next photo away is near the last one.
 ///
 /// By time, for photos with no location (a camera without GPS, location turned off): a run of days
 /// on which you took far more photos than you usually do, with nothing placing you at home.
 enum TripFinder {
     static let awayDistance: CLLocationDistance = 60_000
     static let maxGap: TimeInterval = 7 * 24 * 3600
+    /// How long after a photo at home the trip waits for another away before it counts as over.
+    static let backHomeAfter: TimeInterval = 2 * 24 * 3600
+    /// After a photo at home, the next one away continues the trip only this close to the last one away.
+    /// Further means you went home and left again: a new trip.
+    static let sameTripDistance: CLLocationDistance = 1_000_000
     static let minimumItems = 6
 
     /// A busy day has at least this many times your usual number of photos a day, and never fewer
@@ -38,6 +45,9 @@ enum TripFinder {
         var pending: [MediaItem] = []
         var lastAway = Date.distantPast
         var awayCount = 0
+        /// The first photo at home since the last one away, while the trip may still go on.
+        var homeSince: Date?
+        var lastAwayLocation: CLLocation?
 
         func close() {
             if current.count >= minimumItems, awayCount >= 3 {
@@ -51,20 +61,29 @@ enum TripFinder {
             current = []
             pending = []
             awayCount = 0
+            homeSince = nil
         }
 
         for item in items {
             if !current.isEmpty, item.date.timeIntervalSince(lastAway) > maxGap { close() }
+            if !current.isEmpty, let homeSince, item.date.timeIntervalSince(homeSince) > backHomeAfter { close() }
 
             if let location = item.location {
                 guard location.distance(from: home) > awayDistance else {
-                    if !current.isEmpty { close() }
+                    // Maybe home, maybe a stray: the trip ends only if nothing away follows soon.
+                    // Either way the photo itself isn't part of the trip.
+                    if !current.isEmpty, homeSince == nil { homeSince = item.date }
                     continue
+                }
+                if homeSince != nil, let lastAwayLocation, location.distance(from: lastAwayLocation) > sameTripDistance {
+                    close()
                 }
                 current += pending + [item]
                 pending = []
                 lastAway = item.date
                 awayCount += 1
+                homeSince = nil
+                lastAwayLocation = location
             } else if !current.isEmpty {
                 // No location: part of the trip only if more away photos follow.
                 pending.append(item)
