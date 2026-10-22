@@ -29,6 +29,8 @@ final class Curator {
         /// Across the whole library.
         var curated: Int
         var total: Int
+        /// Why the pass is waiting (the phone is hot, or in Low Power Mode), or nil while it runs.
+        var pauseReason: String?
     }
 
     private(set) var modelState: ModelState
@@ -37,6 +39,11 @@ final class Curator {
 
     private var model: any EyeModel
     private let eye = DesertAntEye()
+    /// What Eye said about each photo, so rule changes don't need Eye to run again.
+    private let records = EyeRecordStore(modelVersion: DesertAntEye.modelVersion)
+    /// The model and rules `analyses` came from. When it isn't the current one, the rules are applied
+    /// again to Eye's saved records.
+    private var analysesVersion: String?
     @ObservationIgnored private var modelReady: Task<Void, Never>?
     @ObservationIgnored private var passTask: Task<Void, Never>?
     private let fileURL: URL
@@ -60,7 +67,7 @@ final class Curator {
 
         progress[trip.id] = Progress(done: 0, total: pending.count)
         let tripID = trip.id
-        let results = await model.analyze(pending) { done in
+        let results = await run(pending) { done in
             Task { @MainActor [weak self] in self?.progress[tripID]?.done = done }
         }
         analyses.merge(results) { _, new in new }
@@ -85,9 +92,10 @@ final class Curator {
                     }
                     let switching = !(model is DesertAntEye)
                     model = eye
-                    modelState = .ready
                     // Results from the stand-in are redone by Eye.
-                    if switching { analyses = [:]; save() }
+                    if switching { analyses = [:]; analysesVersion = nil }
+                    await applyRulesToRecords()
+                    modelState = .ready
                 } catch {
                     modelState = .unavailable
                 }
@@ -120,8 +128,14 @@ final class Curator {
                 // part-way loses little.
                 for chunk in stride(from: 0, to: batch.count, by: 100).map({ Array(batch[$0..<min($0 + 100, batch.count)]) }) {
                     if Task.isCancelled { break }
+                    if let reason = Heat.pauseReason {
+                        libraryPass?.pauseReason = reason
+                        await Heat.waitUntilReady()
+                        libraryPass?.pauseReason = nil
+                        if Task.isCancelled { break }
+                    }
                     let curated = libraryPass?.curated ?? 0, batchDone = libraryPass?.batchDone ?? 0
-                    let results = await model.analyze(chunk) { done in
+                    let results = await run(chunk) { done in
                         Task { @MainActor [weak self] in
                             self?.libraryPass?.curated = curated + done
                             self?.libraryPass?.batchDone = batchDone + done
@@ -134,6 +148,32 @@ final class Curator {
             libraryPass = nil
             passTask = nil
         }
+    }
+
+    /// Runs the model over `items`. With Eye, what it says is saved first, then the rules are applied.
+    private func run(_ items: [MediaItem], progress: @escaping @Sendable (Int) -> Void) async -> [String: EyeAnalysis] {
+        guard let eye = model as? DesertAntEye else { return await model.analyze(items, progress: progress) }
+        let found = await eye.record(items, progress: progress)
+        await records.append(found)
+        return DesertAntEye.translate(found, items: items)
+    }
+
+    /// When the rules changed since `analyses` were made, applies them again to everything Eye has
+    /// already seen. Takes seconds and never runs Eye; only photos Eye hasn't seen are left for the pass.
+    private func applyRulesToRecords() async {
+        guard analysesVersion != model.version else { return }
+        let records = self.records
+        let fresh = await Task.detached(priority: .userInitiated) { () -> [String: EyeAnalysis] in
+            let saved = await records.loadAll()
+            guard !saved.isEmpty else { return [:] }
+            var items: [MediaItem] = []
+            PHAsset.fetchAssets(withLocalIdentifiers: Array(saved.keys), options: nil)
+                .enumerateObjects { asset, _, _ in items.append(MediaItem(asset: asset)) }
+            return DesertAntEye.translate(saved, items: items)
+        }.value
+        analyses = fresh
+        analysesVersion = model.version
+        save()
     }
 
     /// Every photo and video in the library, newest first.
@@ -197,10 +237,11 @@ final class Curator {
     /// - Within each, nothing taken within `apart` of a shot already picked, so each covers its own moment.
     /// - Videos are picked on their own, a couple per filter at most, since a video's score comes from one
     ///   frame and would otherwise crowd out the photos. With only videos to choose from, they get the full share.
-    /// - Your favorites in Photos are always in.
+    /// - Shots with text in them (a menu, a sign-up sheet) are left out.
+    /// - Your favorites in Photos are always in, text or not.
     func highlights(_ items: [MediaItem], share: Double = 0.3, perTag: Int = 15, videosPerTag: Int = 2,
                     apart: TimeInterval = 5 * 60) -> [MediaItem] {
-        let ranked = kept(items).filter { analyses[$0.id] != nil }.sorted { score($0) > score($1) }
+        let ranked = kept(items).filter { analyses[$0.id].map { !$0.showsText } ?? false }.sorted { score($0) > score($1) }
         let photos = ranked.filter { !$0.isVideo }
         let videos = ranked.filter(\.isVideo)
 
@@ -258,6 +299,22 @@ final class Curator {
         var analyses: [String: EyeAnalysis]
         var kept: Set<String>
         var discarded: Set<String>
+
+        init(version: String, analyses: [String: EyeAnalysis], kept: Set<String>, discarded: Set<String>) {
+            self.version = version
+            self.analyses = analyses
+            self.kept = kept
+            self.discarded = discarded
+        }
+
+        /// Analyses saved under older filters may not decode; what you kept and discarded always does.
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            version = try c.decode(String.self, forKey: .version)
+            analyses = (try? c.decode([String: EyeAnalysis].self, forKey: .analyses)) ?? [:]
+            kept = try c.decode(Set<String>.self, forKey: .kept)
+            discarded = try c.decode(Set<String>.self, forKey: .discarded)
+        }
     }
 
     private func load() {
@@ -265,7 +322,10 @@ final class Curator {
               let stored = try? JSONDecoder().decode(Stored.self, from: data) else { return }
         kept = stored.kept
         discarded = stored.discarded
-        if stored.version == model.version { analyses = stored.analyses }
+        if stored.version == model.version {
+            analyses = stored.analyses
+            analysesVersion = stored.version
+        }
     }
 
     private func save() {

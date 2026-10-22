@@ -236,7 +236,7 @@ private struct EyeStatus: View {
             if case .downloading(let fraction) = curator.modelState {
                 row("Downloading Eye", detail: "\(Int(fraction * 100))%", value: fraction)
             } else if let pass = curator.libraryPass {
-                row("Curating photos",
+                row(pass.pauseReason ?? "Curating photos",
                     detail: "\(pass.batchDone.formatted()) of \(pass.batchTotal.formatted())",
                     value: Double(pass.batchDone) / Double(max(pass.batchTotal, 1)),
                     footnote: "\(pass.curated.formatted()) of \(pass.total.formatted()) photos and videos curated")

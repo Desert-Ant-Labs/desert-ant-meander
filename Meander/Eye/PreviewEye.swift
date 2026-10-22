@@ -9,7 +9,7 @@ import Vision
 /// has real, if rougher, results to show. Every request is optional: if Vision is not
 /// available (some simulators), the pixel measurements and Photos metadata still work.
 struct PreviewEye: EyeModel {
-    let version = "preview-2"
+    let version = "preview-3"
 
     func analyze(_ items: [MediaItem], progress: @escaping @Sendable (Int) -> Void) async -> [String: EyeAnalysis] {
         let selfies = Self.selfieIDs()
@@ -59,7 +59,7 @@ struct PreviewEye: EyeModel {
         var tags: Set<EyeTag> = isSelfie ? [.people] : []
         var discard: DiscardReason?
 
-        if asset.mediaSubtypes.contains(.photoScreenshot) { discard = .accidental }
+        if asset.mediaSubtypes.contains(.photoScreenshot) { discard = .screenshot }
         if item.isVideo && item.duration < 1.5 { discard = .accidental }
 
         guard let image = await ImageLoader.shared.cgImage(for: asset, side: 360) else {
@@ -73,6 +73,10 @@ struct PreviewEye: EyeModel {
             let confident = labels.filter { $0.confidence > 0.3 }.map { $0.identifier.lowercased() }
             for (tag, words) in keywords where confident.contains(where: { label in words.contains { label.contains($0) } }) {
                 tags.insert(tag)
+            }
+            let textWords = ["document", "menu", "receipt", "handwriting", "printed_page", "ticket"]
+            if discard == nil, confident.contains(where: { label in textWords.contains { label.contains($0) } }) {
+                discard = .text
             }
         }
 
@@ -90,7 +94,8 @@ struct PreviewEye: EyeModel {
         var aesthetic: Double?
         if !item.isVideo, let scores = try? await CalculateImageAestheticsScoresRequest().perform(on: image.cgImage, orientation: orientation) {
             aesthetic = Double(scores.overallScore)
-            if scores.isUtility, discard == nil { discard = .accidental }
+            // Vision's "utility" photos are receipts, documents and the like.
+            if scores.isUtility, discard == nil { discard = .text }
         }
 
         if discard == nil {

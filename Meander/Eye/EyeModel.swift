@@ -11,6 +11,8 @@ struct EyeAnalysis: Codable, Hashable, Sendable {
     /// 0 to 1. Higher is a better shot. Used to rank and to pick highlights.
     var score: Double
     var discard: DiscardReason?
+    /// Some text in the shot (a sign-up sheet, a menu by a dish). Kept, but left out of highlights.
+    var showsText = false
 }
 
 /// The picker's filters. A photo can be in several.
@@ -49,13 +51,15 @@ enum EyeTag: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 enum DiscardReason: String, Codable, CaseIterable, Identifiable, Sendable {
-    case duplicate, closedEyes, accidental, unfocused, byYou
+    case duplicate, screenshot, text, closedEyes, accidental, unfocused, byYou
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .duplicate: "Duplicates"
+        case .screenshot: "Screenshots"
+        case .text: "Menus and documents"
         case .closedEyes: "Closed eyes"
         case .accidental: "Accidental shots"
         case .unfocused: "Unfocused"
@@ -66,6 +70,8 @@ enum DiscardReason: String, Codable, CaseIterable, Identifiable, Sendable {
     var symbol: String {
         switch self {
         case .duplicate: "square.on.square"
+        case .screenshot: "camera.viewfinder"
+        case .text: "doc.text"
         case .closedEyes: "eye.slash"
         case .accidental: "hand.raised"
         case .unfocused: "camera.aperture"
