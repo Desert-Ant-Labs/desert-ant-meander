@@ -184,6 +184,7 @@
 				DEVELOPMENT_TEAM = Q32R58ALD2;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Meander;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Meander saves the picks you choose into an album in Photos.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Meander finds your trips in Photos and picks the best shots from each one.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -212,6 +213,7 @@
 				DEVELOPMENT_TEAM = Q32R58ALD2;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Meander;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Meander saves the picks you choose into an album in Photos.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Meander finds your trips in Photos and picks the best shots from each one.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
