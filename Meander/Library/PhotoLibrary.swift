@@ -67,6 +67,27 @@ final class PhotoLibrary {
         return (title, pins)
     }
 
+    /// Like `describe`, for a new album: when the picked media isn't part of a trip Meander found
+    /// (photos near home, or picked from All Photos) but some of it has a location, names its places
+    /// from scratch. No pins means none of it has a location.
+    func describePlaces(_ items: [MediaItem]) async -> (title: String, pins: [SavedTrip.Pin]) {
+        let described = describe(items)
+        let located = items.filter { $0.location != nil }.sorted { $0.date < $1.date }
+        guard described.pins.isEmpty, !located.isEmpty else { return described }
+
+        let named = await namer.describe(Trip(id: "picked", title: described.title, items: located))
+        let pins = named.cities.compactMap { city -> SavedTrip.Pin? in
+            let points = city.items.compactMap(\.location)
+            guard !points.isEmpty else { return nil }
+            return SavedTrip.Pin(
+                name: city.name,
+                latitude: points.map(\.coordinate.latitude).reduce(0, +) / Double(points.count),
+                longitude: points.map(\.coordinate.longitude).reduce(0, +) / Double(points.count)
+            )
+        }
+        return (pins.isEmpty ? described.title : named.title, pins)
+    }
+
     func manageLimitedSelection() {
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let root = scene.keyWindow?.rootViewController else { return }

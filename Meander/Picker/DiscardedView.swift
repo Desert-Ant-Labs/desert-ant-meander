@@ -17,7 +17,7 @@ struct DiscardedView: View {
 
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
-                Text("Eye sets aside duplicates, people with closed eyes, accidental shots and unfocused shots. Nothing is deleted from Photos.")
+                Text("Eye sets aside duplicates, screenshots, menus and documents, people with closed eyes, accidental shots and unfocused shots. Nothing is deleted from Photos.")
                     .font(.text(.footnote))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal)

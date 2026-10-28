@@ -1,3 +1,4 @@
+import CoreLocation
 import Observation
 import Photos
 import PhotosUI
@@ -51,8 +52,10 @@ struct MediaPicker: View {
 
     /// IDs already in the trip being added to. They show as added and can't be picked twice.
     var alreadyAdded: Set<String> = []
-    /// The new trip being filled, when there is one. Library trips from its place are listed first.
-    var focus: TripDraft?
+    /// Whether the picker closes once media is added. A new album keeps the sheet open for its next step.
+    var closesOnAdd = true
+    /// The places of the album being added to, when it has any. Trips nearest them are listed first.
+    var near: [CLLocationCoordinate2D] = []
     let onAdd: ([MediaItem]) -> Void
 
     var body: some View {
@@ -97,7 +100,7 @@ struct MediaPicker: View {
             if selection.count > 0 {
                 Button {
                     onAdd(selection.items)
-                    dismiss()
+                    if closesOnAdd { dismiss() }
                 } label: {
                     Text("Add \(selection.count) \(noun(for: selection.items))")
                         .font(.text(.headline, weight: .semibold))
@@ -114,7 +117,7 @@ struct MediaPicker: View {
         .animation(.snappy, value: selection.count > 0)
         .environment(selection)
         .environment(\.alreadyAdded, alreadyAdded)
-        .environment(\.pickerFocus, focus)
+        .environment(\.pickerNear, near)
         .task {
             await library.start()
             if library.access == .full || library.access == .limited {
@@ -126,5 +129,5 @@ struct MediaPicker: View {
 
 extension EnvironmentValues {
     @Entry var alreadyAdded: Set<String> = []
-    @Entry var pickerFocus: TripDraft?
+    @Entry var pickerNear: [CLLocationCoordinate2D] = []
 }

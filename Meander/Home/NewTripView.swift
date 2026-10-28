@@ -1,13 +1,11 @@
 import MapKit
 import SwiftUI
 
-/// A trip that has a name, and usually a place, but no media yet.
+/// A new album's name and, once chosen on the map, its place.
 struct TripDraft: Hashable {
     var title: String
     var latitude: Double?
     var longitude: Double?
-    /// How far from the place still counts as "there", in metres. A country is wider than a city.
-    var radius: Double = 150_000
 
     var coordinate: CLLocationCoordinate2D? {
         guard let latitude, let longitude else { return nil }
@@ -15,10 +13,11 @@ struct TripDraft: Hashable {
     }
 }
 
-/// Step one of adding a trip: search the map for where you went and name the trip.
-/// Step two is the media picker, which then knows the place.
+/// Where a new album was, for media with no location of its own: search the map for the place,
+/// and name the album (choosing a place offers its name).
 struct NewTripView: View {
     @Environment(\.dismiss) private var dismiss
+    var actionTitle = "Create Album"
     let onNext: (TripDraft) -> Void
 
     @State private var search = PlaceSearch()
@@ -92,14 +91,14 @@ struct NewTripView: View {
                 named.title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
                 onNext(named)
             } label: {
-                Text("Choose Photos")
+                Text(actionTitle)
                     .font(.text(.headline, weight: .semibold))
                     .foregroundStyle(Color.canvas)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
             }
             .buttonStyle(.glassProminent)
-            .disabled(draft.title.trimmingCharacters(in: .whitespaces).isEmpty)
+            .disabled(draft.title.trimmingCharacters(in: .whitespaces).isEmpty || draft.coordinate == nil)
         }
         .padding(16)
         .glassEffect(.regular, in: .rect(cornerRadius: 28))
@@ -107,7 +106,7 @@ struct NewTripView: View {
         .padding(.bottom, 8)
     }
 
-    /// Looks the suggestion up, drops a pin, frames it on the map, and offers its name as the trip's.
+    /// Looks the suggestion up, drops a pin, frames it on the map, and offers its name as the album's.
     private func choose(_ result: MKLocalSearchCompletion) async {
         let request = MKLocalSearch.Request(completion: result)
         guard let response = try? await MKLocalSearch(request: request).start(), let place = response.mapItems.first else { return }
@@ -117,8 +116,6 @@ struct NewTripView: View {
         draft.title = result.title
         draft.latitude = coordinate.latitude
         draft.longitude = coordinate.longitude
-        let halfSpan = max(region.span.latitudeDelta, region.span.longitudeDelta) * 111_000 / 2
-        draft.radius = min(max(halfSpan * 1.2, 60_000), 1_500_000)
 
         query = ""
         isSearching = false

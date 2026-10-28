@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 import Photos
 
 /// Runs the model over trips, caches what it says, and remembers what you restore or discard.
@@ -16,9 +17,14 @@ final class Curator {
     enum ModelState: Equatable {
         case downloading(Double)
         case ready
-        /// Eye couldn't download (offline, say). The Vision stand-in does the work until next launch.
-        case unavailable
+        /// Eye couldn't download, with why (offline, say). The Vision stand-in does the work
+        /// until a retry or the next launch.
+        case unavailable(String)
+
+        var isUnavailable: Bool { if case .unavailable = self { true } else { false } }
     }
+
+    private static let log = Logger(subsystem: "com.desertant.meander", category: "Eye")
 
     /// The library pass: newest photos first, 1,000 at a time.
     /// Progress across the whole library: photos Eye has curated, of all the photos there are.
@@ -97,11 +103,30 @@ final class Curator {
                     await applyRulesToRecords()
                     modelState = .ready
                 } catch {
-                    modelState = .unavailable
+                    Self.log.error("Eye couldn't download: \(String(describing: error), privacy: .public)")
+                    modelState = .unavailable(Self.describe(error))
                 }
             }
         }
         await modelReady?.value
+    }
+
+    /// Tries downloading Eye again after it failed, then carries on curating with it.
+    func retryModel() async {
+        guard modelState.isUnavailable else { return }
+        modelReady = nil
+        modelState = .downloading(0)
+        await prepareModel()
+        if modelState == .ready { curateLibrary() }
+    }
+
+    /// What went wrong, in a line: the system's own words for network errors (with the code, so it can
+    /// be looked up), and the SDK's description for anything else.
+    private static func describe(_ error: any Error) -> String {
+        let ns = error as NSError
+        if ns.domain == NSURLErrorDomain { return "\(ns.localizedDescription) (\(ns.code))" }
+        let text = String(describing: error)
+        return text.count > 200 ? String(text.prefix(200)) + "\u{2026}" : text
     }
 
     /// Runs Eye over the whole library, newest first, in batches of 1,000, skipping anything

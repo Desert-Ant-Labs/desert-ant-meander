@@ -5,13 +5,16 @@ struct PickerTripsView: View {
     @Environment(PhotoLibrary.self) private var library
     @Environment(Curator.self) private var curator
     @Environment(\.openURL) private var openURL
-    @Environment(\.pickerFocus) private var focus
+    @Environment(\.pickerNear) private var near
+    /// How far each trip is from the album's places, worked out once per set of trips.
+    @State private var distances: [String: CLLocationDistance] = [:]
 
     var body: some View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .canvas()
             .barTitle("Add Media")
+            .task(id: library.trips.map(\.id)) { distances = Self.distances(of: library.trips, from: near) }
     }
 
     @ViewBuilder
@@ -113,14 +116,32 @@ struct PickerTripsView: View {
         .refreshable { await library.load() }
     }
 
-    /// Trips with photos taken at the new album's place come first, then newest first.
+    /// When adding to an album with places, trips nearest those places come first. Otherwise newest first.
     private func ordered(_ trips: [Trip]) -> [Trip] {
-        guard let focus, let coordinate = focus.coordinate else { return trips }
-        let place = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        let isThere: (Trip) -> Bool = { trip in
-            trip.items.contains { ($0.location?.distance(from: place) ?? .infinity) < focus.radius }
+        guard !distances.isEmpty else { return trips }
+        return trips.enumerated().sorted { a, b in
+            let da = distances[a.element.id] ?? .infinity, db = distances[b.element.id] ?? .infinity
+            return da == db ? a.offset < b.offset : da < db
+        }.map(\.element)
+    }
+
+    /// For each trip, the distance from its nearest photo to the nearest of the album's places.
+    /// Up to 60 photos a trip are checked, spread across it, which is plenty to place it.
+    private static func distances(of trips: [Trip], from near: [CLLocationCoordinate2D]) -> [String: CLLocationDistance] {
+        guard !near.isEmpty else { return [:] }
+        let places = near.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) }
+        var result: [String: CLLocationDistance] = [:]
+        for trip in trips where !trip.isPossible {
+            let located = trip.items.compactMap(\.location)
+            guard !located.isEmpty else { continue }
+            let step = max(1, located.count / 60)
+            var nearest = CLLocationDistance.infinity
+            for location in stride(from: 0, to: located.count, by: step).map({ located[$0] }) {
+                for place in places { nearest = min(nearest, location.distance(from: place)) }
+            }
+            result[trip.id] = nearest
         }
-        return trips.filter(isThere) + trips.filter { !isThere($0) }
+        return result
     }
 
     /// Newest first. Groups Eye has judged and found little nature in are left out; groups it hasn't
@@ -232,7 +253,10 @@ private struct EyeStatus: View {
     @Environment(Curator.self) private var curator
 
     var body: some View {
-        Group {
+        VStack(spacing: 12) {
+            if case .unavailable(let reason) = curator.modelState {
+                unavailable(reason)
+            }
             if case .downloading(let fraction) = curator.modelState {
                 row("Downloading Eye", detail: "\(Int(fraction * 100))%", value: fraction)
             } else if let pass = curator.libraryPass {
@@ -240,13 +264,29 @@ private struct EyeStatus: View {
                     detail: "\(pass.batchDone.formatted()) of \(pass.batchTotal.formatted())",
                     value: Double(pass.batchDone) / Double(max(pass.batchTotal, 1)),
                     footnote: "\(pass.curated.formatted()) of \(pass.total.formatted()) photos and videos curated")
-            } else if curator.modelState == .unavailable {
-                Label("Eye couldn\u{2019}t download. Using on-device sorting for now.", systemImage: "wifi.slash")
-                    .font(.text(.footnote))
-                    .foregroundStyle(.secondary)
             }
         }
         .animation(.default, value: curator.libraryPass == nil)
+    }
+
+    /// Eye couldn't download: why, in the system's or the SDK's words, and a way to try again.
+    private func unavailable(_ reason: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Eye couldn\u{2019}t download. Using on-device sorting for now.", systemImage: "wifi.slash")
+                .font(.text(.footnote, weight: .semibold))
+            Text(reason)
+                .font(.text(.caption))
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+            Button("Try Again", systemImage: "arrow.clockwise") {
+                Task { await curator.retryModel() }
+            }
+            .font(.text(.footnote, weight: .semibold))
+            .buttonStyle(.glass)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.surface, in: .rect(cornerRadius: 16))
     }
 
     private func row(_ title: String, detail: String, value: Double, footnote: String? = nil) -> some View {

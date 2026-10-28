@@ -5,19 +5,16 @@ enum HomeRoute: Hashable {
     case book(UUID)
 }
 
-/// Where picked media goes: a new trip, or one that already exists.
+/// Where picked media goes: a new album, or one that already exists.
 enum PickerTarget: Identifiable, Hashable {
-    /// Naming a new trip and finding it on the map.
+    /// A new album: pick its media, then it's named and placed from them.
     case newTrip
-    /// Picking media for a new trip that has been named.
-    case draft(TripDraft)
     /// Adding to an album that exists, at a place in it.
     case trip(UUID, MediaPosition)
 
     var id: String {
         switch self {
         case .newTrip: "new"
-        case .draft(let draft): "draft-\(draft.title)"
         case .trip(let id, _): id.uuidString
         }
     }
@@ -33,6 +30,9 @@ struct HomeView: View {
     @State private var tab: Tab = .trips
     @State private var path: [HomeRoute] = []
     @State private var picker: PickerTarget?
+    /// A new album to open once the sheet that made it has closed. Opening it while the sheet is
+    /// still closing leaves the album without its toolbar.
+    @State private var madeTrip: UUID?
     @State private var titleCollapsed = false
     @State private var scrollPosition = ScrollPosition(edge: .top)
 
@@ -130,43 +130,81 @@ struct HomeView: View {
                 }
             }
         }
-        .sheet(item: $picker) { target in
-            if target == .newTrip {
-                // Step one. Finishing it swaps this sheet for the picker.
-                NewTripView { draft in picker = .draft(draft) }
-            } else {
-                PickerSheet(target: target) { newTripID in
-                    if let newTripID, case .draft = target { path = [.trip(newTripID)] }
-                }
+        .sheet(item: $picker, onDismiss: {
+            if let madeTrip { path = [.trip(madeTrip)] }
+            madeTrip = nil
+        }) { target in
+            PickerSheet(target: target) { newTripID in
+                if target == .newTrip { madeTrip = newTripID }
             }
         }
     }
 }
 
+/// Adding media, as one sheet. For a new album: pick the media first. If any of it has a location,
+/// the album is made straight away, named and pinned from where the photos were taken. If none of it
+/// does, the next step asks where it was, then makes the album.
 private struct PickerSheet: View {
     @Environment(TripStore.self) private var store
     @Environment(PhotoLibrary.self) private var library
+    @Environment(\.dismiss) private var dismiss
     let target: PickerTarget
     let onDone: (UUID?) -> Void
 
+    private enum Step: Equatable {
+        case picking
+        /// Naming the places the picked media was taken.
+        case placing
+        /// The picked media has no location: where was it?
+        case locating([MediaItem])
+    }
+    @State private var step = Step.picking
+
     var body: some View {
+        switch step {
+        case .picking:
+            picker
+        case .placing:
+            ProgressView("Making your album\u{2026}")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .canvas()
+        case .locating(let items):
+            NewTripView(actionTitle: "Create Album") { draft in
+                let pin = draft.coordinate.map { SavedTrip.Pin(name: draft.title, latitude: $0.latitude, longitude: $0.longitude) }
+                finish(store.add(items, title: draft.title, pins: pin.map { [$0] } ?? [], to: nil))
+            }
+        }
+    }
+
+    private var picker: some View {
         var tripID: UUID?
-        var draft: TripDraft?
         var position = MediaPosition.end
         if case .trip(let id, let at) = target { tripID = id; position = at }
-        if case .draft(let named) = target { draft = named }
         let existing = tripID.flatMap(store.trip)
 
-        return MediaPicker(alreadyAdded: Set(existing?.assetIDs ?? []), focus: draft) { items in
-            let described = library.describe(items)
-            // A new trip keeps the name it was given. Its places come from the photos;
-            // if the photos have no location, the place chosen on the map stands in.
-            var pins = described.pins
-            if pins.isEmpty, let draft, let coordinate = draft.coordinate {
-                pins = [SavedTrip.Pin(name: draft.title, latitude: coordinate.latitude, longitude: coordinate.longitude)]
+        return MediaPicker(alreadyAdded: Set(existing?.assetIDs ?? []),
+                           closesOnAdd: tripID != nil,
+                           near: existing?.pins.map(\.coordinate) ?? []) { items in
+            if let tripID {
+                let described = library.describe(items)
+                onDone(store.add(items, title: described.title, pins: described.pins, to: tripID, at: position))
+                return
             }
-            onDone(store.add(items, title: draft?.title ?? described.title, pins: pins, to: tripID, at: position))
+            step = .placing
+            Task {
+                let described = await library.describePlaces(items)
+                if described.pins.isEmpty {
+                    step = .locating(items)
+                } else {
+                    finish(store.add(items, title: described.title, pins: described.pins, to: nil))
+                }
+            }
         }
+    }
+
+    private func finish(_ tripID: UUID?) {
+        onDone(tripID)
+        dismiss()
     }
 }
 
