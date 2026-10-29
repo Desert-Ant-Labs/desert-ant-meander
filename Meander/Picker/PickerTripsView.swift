@@ -172,7 +172,7 @@ private struct PossibleTripRow: View {
                         Label("\(signal.nature) nature \(signal.nature == 1 ? "photo" : "photos") \u{00B7} \(trip.items.count) in all",
                               systemImage: "mountain.2")
                     } else {
-                        Label("Looking through photos\u{2026} \u{00B7} \(trip.items.count) photos", systemImage: "sparkles")
+                        Label("Curating \(trip.items.count) photos\u{2026}", systemImage: "sparkles")
                             .shimmer()
                     }
                 }
@@ -247,26 +247,46 @@ private struct LimitedAccessBanner: View {
     }
 }
 
-/// What Eye is doing: downloading, or curating the library 1,000 photos at a time, with the total
-/// across the whole library beneath.
+/// One quiet line while trips are still being sorted (or why it's paused), with how many photos
+/// across the library are curated so far. When setup fails, a card says why with a way to try again.
 private struct EyeStatus: View {
     @Environment(Curator.self) private var curator
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             if case .unavailable(let reason) = curator.modelState {
                 unavailable(reason)
             }
-            if case .downloading(let fraction) = curator.modelState {
-                row("Getting ready", detail: "\(Int(fraction * 100))%", value: fraction)
-            } else if let pass = curator.libraryPass {
-                row(pass.pauseReason ?? "Curating photos",
-                    detail: "\(pass.batchDone.formatted()) of \(pass.batchTotal.formatted())",
-                    value: Double(pass.batchDone) / Double(max(pass.batchTotal, 1)),
-                    footnote: "\(pass.curated.formatted()) of \(pass.total.formatted()) photos and videos curated")
+            if isWorking {
+                HStack {
+                    if let pause = curator.libraryPass?.pauseReason {
+                        Label(pause, systemImage: "pause.circle")
+                    } else {
+                        Label("Finding trips\u{2026}", systemImage: "sparkles").shimmer()
+                    }
+                    Spacer()
+                    // Across the whole library, not just this batch.
+                    if let pass = curator.libraryPass {
+                        Text("\(pass.curated.formatted()) of \(pass.total.formatted()) curated")
+                            .font(.text(.subheadline))
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                }
+                .font(.text(.subheadline, weight: .semibold))
+                // The same container as the discarded photos row.
+                .padding(.horizontal)
+                .padding(.vertical, 14)
+                .background(Color.surface, in: .rect(cornerRadius: 14))
             }
         }
-        .animation(.default, value: curator.libraryPass == nil)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.default, value: isWorking)
+    }
+
+    private var isWorking: Bool {
+        if case .downloading = curator.modelState { return true }
+        return curator.libraryPass != nil
     }
 
     /// Eye couldn't download: why, in the system's or the SDK's words, and a way to try again.
@@ -288,22 +308,6 @@ private struct EyeStatus: View {
         .padding()
         .background(Color.surface, in: .rect(cornerRadius: 16))
     }
-
-    private func row(_ title: String, detail: String, value: Double, footnote: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(title).font(.text(.footnote, weight: .semibold)).shimmer()
-                Spacer()
-                Text(detail).font(.text(.footnote)).foregroundStyle(.secondary).monospacedDigit()
-            }
-            ProgressView(value: value)
-            if let footnote {
-                Text(footnote).font(.text(.caption)).foregroundStyle(.secondary).monospacedDigit()
-            }
-        }
-        .padding()
-        .background(Color.surface, in: .rect(cornerRadius: 16))
-    }
 }
 
 /// While trips are being found: the shape of the screen to come, in placeholder grey, gently pulsing.
@@ -312,7 +316,7 @@ private struct LoadingTrips: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("Finding trips in your photos\u{2026}", systemImage: "sparkles")
+            Label("Finding trips\u{2026}", systemImage: "sparkles")
                 .font(.text(.footnote, weight: .medium))
                 .foregroundStyle(.secondary)
                 .shimmer()
