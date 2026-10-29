@@ -140,7 +140,7 @@ struct CurationStatus: View {
     var body: some View {
         if let progress = curator.progress[tripID] {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Eye is curating \(progress.done) of \(progress.total)")
+                Text("Curating \(progress.done) of \(progress.total)")
                     .font(.text(.footnote, weight: .semibold))
                 ProgressView(value: Double(progress.done), total: Double(max(progress.total, 1)))
             }

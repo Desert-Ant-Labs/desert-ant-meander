@@ -85,7 +85,7 @@ struct PickerTripsView: View {
                 if !possible.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Curated Trips").font(.heading(.title2))
-                        Text("Busy days with no location data. Eye keeps those with landscapes and nature.")
+                        Text("Busy days including nature or landscapes.")
                             .font(.text(.footnote))
                             .foregroundStyle(.secondary)
                     }
@@ -172,7 +172,7 @@ private struct PossibleTripRow: View {
                         Label("\(signal.nature) nature \(signal.nature == 1 ? "photo" : "photos") \u{00B7} \(trip.items.count) in all",
                               systemImage: "mountain.2")
                     } else {
-                        Label("Eye is looking\u{2026} \u{00B7} \(trip.items.count) photos", systemImage: "sparkles")
+                        Label("Looking through photos\u{2026} \u{00B7} \(trip.items.count) photos", systemImage: "sparkles")
                             .shimmer()
                     }
                 }
@@ -258,7 +258,7 @@ private struct EyeStatus: View {
                 unavailable(reason)
             }
             if case .downloading(let fraction) = curator.modelState {
-                row("Downloading Eye", detail: "\(Int(fraction * 100))%", value: fraction)
+                row("Getting ready", detail: "\(Int(fraction * 100))%", value: fraction)
             } else if let pass = curator.libraryPass {
                 row(pass.pauseReason ?? "Curating photos",
                     detail: "\(pass.batchDone.formatted()) of \(pass.batchTotal.formatted())",
@@ -272,7 +272,7 @@ private struct EyeStatus: View {
     /// Eye couldn't download: why, in the system's or the SDK's words, and a way to try again.
     private func unavailable(_ reason: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Eye couldn\u{2019}t download. Using on-device sorting for now.", systemImage: "wifi.slash")
+            Label("Couldn\u{2019}t finish setting up. Photos are sorted more simply for now.", systemImage: "wifi.slash")
                 .font(.text(.footnote, weight: .semibold))
             Text(reason)
                 .font(.text(.caption))

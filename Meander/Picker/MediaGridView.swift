@@ -163,7 +163,7 @@ struct MediaGridView: View {
             Menu {
                 Picker("Order", selection: $rankByEye) {
                     Label("By Date", systemImage: "calendar").tag(false)
-                    Label("By Eye Score", systemImage: "sparkles").tag(true)
+                    Label("Best First", systemImage: "sparkles").tag(true)
                 }
             } label: {
                 Label("Options", systemImage: "ellipsis")

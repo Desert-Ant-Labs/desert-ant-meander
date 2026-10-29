@@ -52,7 +52,7 @@ private struct EyePanel: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 if let analysis = curator.analyses[item.id] {
-                    Text("Eye score \(Int((analysis.score * 100).rounded()))")
+                    Text("Score \(Int((analysis.score * 100).rounded()))")
                         .font(.text(.subheadline, weight: .semibold))
                     let tags = EyeTag.allCases.filter(analysis.tags.contains)
                     if let reason {
