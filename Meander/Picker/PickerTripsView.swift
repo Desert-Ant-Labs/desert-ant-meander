@@ -8,6 +8,13 @@ struct PickerTripsView: View {
     @Environment(\.pickerNear) private var near
     /// How far each trip is from the album's places, worked out once per set of trips.
     @State private var distances: [String: CLLocationDistance] = [:]
+    @State private var grouping = Grouping.location
+
+    /// Trips found by where photos were taken, or by busy days with no location.
+    enum Grouping: String, CaseIterable, Identifiable {
+        case location = "by Location", date = "by Date"
+        var id: Self { self }
+    }
 
     var body: some View {
         content
@@ -57,32 +64,40 @@ struct PickerTripsView: View {
     }
 
     private var list: some View {
-        ScrollView {
+        let trips = ordered(library.trips.filter { !$0.isPossible })
+        let possible = possibleTrips
+        // The control only appears when there are trips of both kinds to choose between.
+        let showsControl = !trips.isEmpty && !possible.isEmpty
+        let shown = showsControl ? grouping : (trips.isEmpty ? .date : .location)
+
+        return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if library.access == .limited {
                     LimitedAccessBanner().padding(.horizontal)
                 }
                 EyeStatus().padding(.horizontal)
 
-                let trips = ordered(library.trips.filter { !$0.isPossible })
-                if !trips.isEmpty {
-                    Text("Trips").font(.heading(.title2)).padding(.horizontal)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 12) {
-                            ForEach(trips) { trip in
-                                NavigationLink(value: Route.trip(trip.id)) {
-                                    TripCard(trip: trip).frame(width: 260, height: 200)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal)
+                if showsControl {
+                    Picker("Trips", selection: $grouping) {
+                        ForEach(Grouping.allCases) { Text($0.rawValue).tag($0) }
                     }
-                    .scrollClipDisabled()
+                    .pickerStyle(.segmented)
+                    .controlSize(.large)
+                    .padding(.horizontal)
                 }
 
-                let possible = possibleTrips
-                if !possible.isEmpty {
+                switch shown {
+                case .location:
+                    Text("Trips").font(.heading(.title2)).padding(.horizontal)
+                    LazyVStack(spacing: 12) {
+                        ForEach(trips) { trip in
+                            NavigationLink(value: Route.trip(trip.id)) { TripCard(trip: trip) }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal)
+
+                case .date:
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Curated Trips").font(.heading(.title2))
                         Text("Busy days including nature or landscapes.")
@@ -90,21 +105,18 @@ struct PickerTripsView: View {
                             .foregroundStyle(.secondary)
                     }
                     .padding(.horizontal)
-                    .padding(.top, trips.isEmpty ? 0 : 8)
 
                     // Under a heading per year, newest year first.
                     let years = Dictionary(grouping: possible) { Calendar.current.component(.year, from: $0.start) }
-                    LazyVStack(alignment: .leading, spacing: 10) {
+                    LazyVStack(alignment: .leading, spacing: 12) {
                         ForEach(years.keys.sorted(by: >), id: \.self) { year in
                             Text(String(year))
                                 .font(.heading(.title3))
                                 .padding(.top, 6)
                             ForEach(years[year] ?? []) { trip in
                                 // Curated trips have no places, so they open on their photos.
-                                NavigationLink(value: Route.scope(trip.scope)) {
-                                    PossibleTripRow(trip: trip)
-                                }
-                                .buttonStyle(.plain)
+                                NavigationLink(value: Route.scope(trip.scope)) { TripCard(trip: trip) }
+                                    .buttonStyle(.plain)
                             }
                         }
                     }
@@ -157,76 +169,60 @@ struct PickerTripsView: View {
     }
 }
 
-/// A possible trip: its dates, what Eye found in it, and its best photo.
-private struct PossibleTripRow: View {
-    @Environment(Curator.self) private var curator
-    let trip: Trip
-
-    var body: some View {
-        let signal = curator.travelSignal(trip.items)
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(trip.title).font(.heading(.title3))
-                Group {
-                    if signal.isJudged {
-                        Label("\(signal.nature) nature \(signal.nature == 1 ? "photo" : "photos") \u{00B7} \(trip.items.count) in all",
-                              systemImage: "mountain.2")
-                    } else {
-                        Label("Curating \(trip.items.count) photos\u{2026}", systemImage: "sparkles")
-                            .shimmer()
-                    }
-                }
-                .font(.text(.caption))
-                .foregroundStyle(.secondary)
-            }
-            Spacer()
-            // Always a nature shot: the best one once Eye has found it; until then, a placeholder.
-            Group {
-                if let cover = curator.natureCover(trip.items) {
-                    AssetImage(asset: cover.asset)
-                } else {
-                    Image(systemName: "mountain.2").foregroundStyle(.tertiary)
-                }
-            }
-            .frame(width: 84, height: 84)
-            .background(.fill.tertiary)
-            .clipShape(.rect(cornerRadius: 12))
-        }
-        .padding(12)
-        .padding(.leading, 4)
-        .background(Color.surface, in: .rect(cornerRadius: 20))
-        .contentShape(.rect(cornerRadius: 20))
-        .accessibilityElement(children: .combine)
-    }
-}
-
+/// A trip as a photo card, the same for both kinds. A trip found by place shows its name and month
+/// over its best shot. A curated trip shows its dates and what was found in it over its best nature shot.
 private struct TripCard: View {
     @Environment(Curator.self) private var curator
     let trip: Trip
 
     var body: some View {
+        let cover = trip.isPossible ? curator.natureCover(trip.items) : curator.cover(trip.items)
         ZStack(alignment: .bottomLeading) {
-            if let cover = curator.cover(trip.items) {
-                AssetImage(asset: cover.asset)
-            } else {
-                Rectangle().fill(.quaternary)
+            Group {
+                if let cover {
+                    AssetImage(asset: cover.asset)
+                } else {
+                    Rectangle().fill(.quaternary)
+                        .overlay(alignment: .top) {
+                            Image(systemName: "mountain.2")
+                                .font(.title)
+                                .foregroundStyle(.tertiary)
+                                .padding(.top, 56)
+                        }
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
             LinearGradient(colors: [.clear, .black.opacity(0.65)], startPoint: .center, endPoint: .bottom)
             VStack(alignment: .leading, spacing: 2) {
                 Text(trip.title)
                     .font(.heading(.title2))
                     .redacted(reason: trip.isLocating ? .placeholder : [])
-                Text(trip.month)
-                    .dateTracking(.subheadline)
+                subtitle
                     .font(.text(.subheadline))
                     .opacity(0.85)
             }
             .foregroundStyle(Color.paper)
             .padding()
         }
+        .frame(height: 200)
         .clipShape(.rect(cornerRadius: 24))
         .contentShape(.rect(cornerRadius: 24))
         .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private var subtitle: some View {
+        if trip.isPossible {
+            let signal = curator.travelSignal(trip.items)
+            if signal.isJudged {
+                Text("\(signal.nature) nature \(signal.nature == 1 ? "photo" : "photos") \u{00B7} \(trip.items.count) in all")
+            } else {
+                Text("Curating \(trip.items.count) photos\u{2026}").shimmer()
+            }
+        } else {
+            Text(trip.month).dateTracking(.subheadline)
+        }
     }
 }
 
@@ -324,35 +320,10 @@ private struct LoadingTrips: View {
 
             Text("Trips").font(.heading(.title2))
                 .padding(.horizontal)
-            // Laid out like the real row: it runs off the right edge without widening the screen.
-            ScrollView(.horizontal) {
-                HStack(spacing: 12) {
-                    ForEach(0..<2, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 24).fill(Color.surface).frame(width: 260, height: 200)
-                    }
-                }
-                .padding(.horizontal)
-            }
-            .scrollDisabled(true)
-            .scrollIndicators(.hidden)
-            .opacity(dim ? 0.5 : 1)
-
-            Text("Curated Trips").font(.heading(.title2))
-                .padding(.horizontal)
-                .padding(.top, 8)
-            VStack(spacing: 10) {
+            // Laid out like the real column of trip cards.
+            VStack(spacing: 12) {
                 ForEach(0..<3, id: \.self) { _ in
-                    HStack(spacing: 14) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Capsule().fill(.fill.secondary).frame(width: 150, height: 14)
-                            Capsule().fill(.fill.tertiary).frame(width: 100, height: 10)
-                        }
-                        Spacer()
-                        RoundedRectangle(cornerRadius: 12).fill(.fill.tertiary).frame(width: 84, height: 84)
-                    }
-                    .padding(12)
-                    .padding(.leading, 4)
-                    .background(Color.surface, in: .rect(cornerRadius: 20))
+                    RoundedRectangle(cornerRadius: 24).fill(Color.surface).frame(height: 200)
                 }
             }
             .padding(.horizontal)
