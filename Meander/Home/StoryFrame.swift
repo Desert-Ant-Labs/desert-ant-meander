@@ -77,19 +77,21 @@ enum StoryFrame {
     }
 }
 
-/// Two photos sharing a screen, one above the other.
+/// Two photos sharing a screen, one above the other, each in its own rounded frame.
 struct SplitFrame: View {
     let top: MediaItem
     let bottom: MediaItem
     let shapes: StoryFrame.Shapes
-    private let gap: CGFloat = 3
+    private let gap = CardMetrics.gap
 
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: gap) {
                 AssetImage(asset: top.asset, full: true)
                     .frame(height: (geometry.size.height - gap) * StoryFrame.topShare(top, bottom, shapes))
+                    .clipShape(.rect(cornerRadius: CardMetrics.albumCornerRadius))
                 AssetImage(asset: bottom.asset, full: true)
+                    .clipShape(.rect(cornerRadius: CardMetrics.albumCornerRadius))
             }
         }
     }

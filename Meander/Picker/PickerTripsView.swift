@@ -71,7 +71,7 @@ struct PickerTripsView: View {
         let shown = showsControl ? grouping : (trips.isEmpty ? .date : .location)
 
         return ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(spacing: 12) {
                 if library.access == .limited {
                     LimitedAccessBanner().padding(.horizontal)
                 }
@@ -88,41 +88,32 @@ struct PickerTripsView: View {
 
                 switch shown {
                 case .location:
-                    Text("Trips").font(.heading(.title2)).padding(.horizontal)
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: CardMetrics.gap) {
                         ForEach(trips) { trip in
                             NavigationLink(value: Route.trip(trip.id)) { TripCard(trip: trip) }
                                 .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, CardMetrics.gap)
 
                 case .date:
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Curated Trips").font(.heading(.title2))
-                        Text("Busy days including nature or landscapes.")
-                            .font(.text(.footnote))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal)
-
-                    // Under a heading per year, newest year first.
-                    let years = Dictionary(grouping: possible) { Calendar.current.component(.year, from: $0.start) }
-                    LazyVStack(alignment: .leading, spacing: 12) {
-                        ForEach(years.keys.sorted(by: >), id: \.self) { year in
-                            Text(String(year))
-                                .font(.heading(.title3))
-                                .padding(.top, 6)
-                            ForEach(years[year] ?? []) { trip in
-                                // Curated trips have no places, so they open on their photos.
-                                NavigationLink(value: Route.scope(trip.scope)) { TripCard(trip: trip) }
-                                    .buttonStyle(.plain)
-                            }
+                    Text("Busy days including nature or landscapes")
+                        .font(.serif(.subheadline))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    // Newest first.
+                    LazyVStack(spacing: CardMetrics.gap) {
+                        ForEach(possible) { trip in
+                            // Curated trips have no places, so they open on their photos.
+                            NavigationLink(value: Route.scope(trip.scope)) { TripCard(trip: trip) }
+                                .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, CardMetrics.gap)
                 }
             }
+            .padding(.top, 4)
             .padding(.bottom)
         }
         .refreshable { await library.load() }
@@ -169,59 +160,27 @@ struct PickerTripsView: View {
     }
 }
 
-/// A trip as a photo card, the same for both kinds. A trip found by place shows its name and month
-/// over its best shot. A curated trip shows its dates and what was found in it over its best nature shot.
+/// A trip as a photo card, the same card as albums on the home screen. A trip found by place shows
+/// its month and cities beneath its name. A curated trip shows what was found in it, over its best
+/// nature shot.
 private struct TripCard: View {
     @Environment(Curator.self) private var curator
     let trip: Trip
 
     var body: some View {
         let cover = trip.isPossible ? curator.natureCover(trip.items) : curator.cover(trip.items)
-        ZStack(alignment: .bottomLeading) {
-            Group {
-                if let cover {
-                    AssetImage(asset: cover.asset)
+        PhotoCard(cover: cover?.asset, title: trip.title, isLocating: !trip.isPossible && trip.isLocating) {
+            if trip.isPossible {
+                let signal = curator.travelSignal(trip.items)
+                if signal.isJudged {
+                    Text(cardDetail(["\(signal.nature) nature \(signal.nature == 1 ? "photo" : "photos")", "\(trip.items.count) in all"]))
                 } else {
-                    Rectangle().fill(.quaternary)
-                        .overlay(alignment: .top) {
-                            Image(systemName: "mountain.2")
-                                .font(.title)
-                                .foregroundStyle(.tertiary)
-                                .padding(.top, 56)
-                        }
+                    Text("Curating \(trip.items.count) photos\u{2026}").shimmer()
                 }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
-            LinearGradient(colors: [.clear, .black.opacity(0.65)], startPoint: .center, endPoint: .bottom)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(trip.title)
-                    .font(.heading(.title2))
-                    .redacted(reason: trip.isLocating ? .placeholder : [])
-                subtitle
-                    .font(.text(.subheadline))
-                    .opacity(0.85)
-            }
-            .foregroundStyle(Color.paper)
-            .padding()
-        }
-        .frame(height: 200)
-        .clipShape(.rect(cornerRadius: 24))
-        .contentShape(.rect(cornerRadius: 24))
-        .accessibilityElement(children: .combine)
-    }
-
-    @ViewBuilder
-    private var subtitle: some View {
-        if trip.isPossible {
-            let signal = curator.travelSignal(trip.items)
-            if signal.isJudged {
-                Text("\(signal.nature) nature \(signal.nature == 1 ? "photo" : "photos") \u{00B7} \(trip.items.count) in all")
             } else {
-                Text("Curating \(trip.items.count) photos\u{2026}").shimmer()
+                let cities = trip.cities.map(\.name).filter { $0 != trip.title }.prefix(2)
+                Text(cardDetail([trip.month] + cities))
             }
-        } else {
-            Text(trip.month).dateTracking(.subheadline)
         }
     }
 }
@@ -264,16 +223,12 @@ private struct EyeStatus: View {
                     // Across the whole library, not just this batch.
                     if let pass = curator.libraryPass {
                         Text("\(pass.curated.formatted()) of \(pass.total.formatted()) curated")
-                            .font(.text(.subheadline))
+                            .font(.text(.footnote))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                     }
                 }
-                .font(.text(.subheadline, weight: .semibold))
-                // The same container as the discarded photos row.
-                .padding(.horizontal)
-                .padding(.vertical, 14)
-                .background(Color.surface, in: .rect(cornerRadius: 14))
+                .font(.text(.footnote, weight: .medium))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -311,6 +266,8 @@ private struct LoadingTrips: View {
     @State private var dim = false
 
     var body: some View {
+        // In a still scroll view, so the cards run off the bottom rather than pushing the line off the top.
+        ScrollView {
         VStack(alignment: .leading, spacing: 16) {
             Label("Finding trips\u{2026}", systemImage: "sparkles")
                 .font(.text(.footnote, weight: .medium))
@@ -318,18 +275,22 @@ private struct LoadingTrips: View {
                 .shimmer()
                 .padding(.horizontal)
 
-            Text("Trips").font(.heading(.title2))
-                .padding(.horizontal)
             // Laid out like the real column of trip cards.
-            VStack(spacing: 12) {
+            VStack(spacing: CardMetrics.gap) {
                 ForEach(0..<3, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 24).fill(Color.surface).frame(height: 200)
+                    RoundedRectangle(cornerRadius: CardMetrics.cornerRadius)
+                        .fill(Color.surface)
+                        .aspectRatio(CardMetrics.aspectRatio, contentMode: .fit)
+                        // Height from the full width, so the screen's height doesn't shrink them.
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, CardMetrics.gap)
             .opacity(dim ? 0.5 : 1)
         }
         .padding(.top, 8)
+        }
+        .scrollDisabled(true)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
             withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { dim = true }

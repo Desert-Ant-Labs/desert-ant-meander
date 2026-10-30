@@ -52,81 +52,87 @@ struct TripStoryView: View {
             let current = slides[safe: index]
             let currentVideo: MediaItem? = if case .media(let items) = current, items.count == 1, items[0].isVideo { items[0] } else { nil }
             let isNote: Bool = if case .note = current { true } else { false }
-            ZStack(alignment: .bottomLeading) {
-                Color.black.ignoresSafeArea()
-
-                switch current {
-                case .map:
-                    TripRouteMap(stops: stops)
-                        .ignoresSafeArea()
-                        .transition(.opacity)
-                case .media(let frame):
-                    Group {
-                        if frame.count == 2 {
-                            SplitFrame(top: frame[0], bottom: frame[1], shapes: shapes ?? [:])
-                        } else if let video = currentVideo {
-                            StoryVideo(asset: video.asset, isPaused: isPaused) { step(1, count: slideCount) }
-                        } else {
-                            AssetImage(asset: frame[0].asset, full: true)
-                        }
-                    }
-                    .ignoresSafeArea()
-                    .id(current?.id)
-                    .transition(.opacity)
-                case .note(let note):
-                    JournalNoteView(note: note)
-                        .ignoresSafeArea()
-                        .id(current?.id)
-                        .transition(.opacity)
-                case nil:
-                    ContentUnavailableView {
-                        Label("Nothing in this album yet", systemImage: "photo.on.rectangle")
-                    } actions: {
-                        Button("Add Media") { onAddMedia(.end) }
-                            .buttonStyle(.glass)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .environment(\.colorScheme, .dark)
-                }
-
-                if !isNote {
-                    LinearGradient(colors: [.black.opacity(0.45), .clear, .clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom)
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
-                }
-
-                HStack(spacing: 0) {
-                    Color.clear.contentShape(.rect).onTapGesture { step(-1, count: slideCount) }
-                    Color.clear.contentShape(.rect).onTapGesture { step(1, count: slideCount) }
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(trip.month)
-                        .dateTracking(.caption)
-                        .font(.text(.caption))
-                        .opacity(0.6)
-                    Text(trip.title).font(.albumTitle(.title))
-                    Text(trip.subtitle).font(.text(.subheadline)).opacity(0.9)
-                }
-                .foregroundStyle(Color.paper)
-                .padding()
-                .padding(.bottom, 8)
-                .opacity(isNote ? 0 : 1)
-                .allowsHitTesting(false)
-            }
-            .overlay(alignment: .top) {
+            // A line per screen under the top bar, then the story in a rounded frame inset from the screen's edges.
+            VStack(spacing: 10) {
                 // Tighter gaps once there are many lines, so each one keeps some width.
                 HStack(spacing: slideCount > 20 ? 2 : 4) {
                     ForEach(0..<slideCount, id: \.self) { i in
                         Capsule()
-                            .fill((isNote ? Color.meanderDark : Color.paper).opacity(i <= index ? 1 : 0.25))
+                            .fill(Color.ink.opacity(i <= index ? 1 : 0.2))
                             .frame(height: 3)
                     }
                 }
                 .animation(nil, value: index)
-                .padding(.horizontal)
+                .padding(.horizontal, 20)
                 .padding(.top, 4)
+
+                ZStack(alignment: .bottom) {
+                    switch current {
+                    case .map:
+                        TripRouteMap(stops: stops)
+                            .transition(.opacity)
+                    case .media(let frame):
+                        Group {
+                            if frame.count == 2 {
+                                SplitFrame(top: frame[0], bottom: frame[1], shapes: shapes ?? [:])
+                            } else if let video = currentVideo {
+                                StoryVideo(asset: video.asset, isPaused: isPaused) { step(1, count: slideCount) }
+                                    .clipShape(.rect(cornerRadius: CardMetrics.albumCornerRadius))
+                            } else {
+                                AssetImage(asset: frame[0].asset, full: true)
+                                    .clipShape(.rect(cornerRadius: CardMetrics.albumCornerRadius))
+                            }
+                        }
+                        .id(current?.id)
+                        .transition(.opacity)
+                    case .note(let note):
+                        JournalNoteView(note: note)
+                            .id(current?.id)
+                            .transition(.opacity)
+                    case nil:
+                        ContentUnavailableView {
+                            Label("Nothing in this album yet", systemImage: "photo.on.rectangle")
+                        } actions: {
+                            Button("Add Media") { onAddMedia(.end) }
+                                .buttonStyle(.glass)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+
+                    if !isNote {
+                        LinearGradient(colors: [.clear, .clear, .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)
+                            .allowsHitTesting(false)
+                    }
+
+                    HStack(spacing: 0) {
+                        Color.clear.contentShape(.rect).onTapGesture { step(-1, count: slideCount) }
+                        Color.clear.contentShape(.rect).onTapGesture { step(1, count: slideCount) }
+                    }
+
+                    VStack(spacing: 8) {
+                        Text(trip.title)
+                            .font(.albumTitle(size: 40))
+                            .textCase(.uppercase)
+                            .lineLimit(2)
+                        Text(cardDetail([trip.month, trip.subtitle.replacingOccurrences(of: "\u{2022}", with: "\u{00B7}")]))
+                            .font(.cardDetail)
+                            .tracking(1)
+                            .textCase(.uppercase)
+                            .lineLimit(1)
+                    }
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(Color.paper)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 40)
+                    .opacity(isNote ? 0 : 1)
+                    .allowsHitTesting(false)
+                }
+                .clipShape(.rect(cornerRadius: CardMetrics.albumCornerRadius))
             }
+            .padding(.horizontal, CardMetrics.gap)
+            .padding(.bottom, CardMetrics.gap)
+            .ignoresSafeArea(edges: .bottom)
+            .canvas()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu("Add", systemImage: "plus") {
@@ -180,7 +186,6 @@ struct TripStoryView: View {
                     }
                 }
             }
-            .toolbarColorScheme(isNote ? .light : .dark, for: .navigationBar)
             .toolbarBackground(.hidden, for: .navigationBar)
             .task(id: highlights.map(\.id)) {
                 shapes = await StoryFrame.measure(highlights)

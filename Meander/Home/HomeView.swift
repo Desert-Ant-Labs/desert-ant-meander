@@ -35,13 +35,15 @@ struct HomeView: View {
     @State private var madeTrip: UUID?
     @State private var titleCollapsed = false
     @State private var scrollPosition = ScrollPosition(edge: .top)
+    /// Ties each album card to its album, so the card grows into the album when opened.
+    @Namespace private var albumZoom
 
     private var header: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 0) {
             Wordmark()
-                .frame(width: 214)
                 .frame(maxWidth: .infinity)
-                .padding(.top, 4)
+                // All capitals, so the space the font keeps for descenders below the line is trimmed.
+                .padding(.bottom, -12)
             tabs
         }
     }
@@ -87,7 +89,7 @@ struct HomeView: View {
                         VStack(spacing: 0) {
                             header
                             switch tab {
-                            case .trips: TripCardsView()
+                            case .trips: TripCardsView(zoom: albumZoom)
                             case .books: BooksView()
                             case .map:
                                 TripsMapView { path.append(.trip($0)) }
@@ -113,8 +115,7 @@ struct HomeView: View {
             .toolbar {
                 // The small wordmark, shown only once the large one has scrolled under the bar.
                 ToolbarItem(placement: .title) {
-                    Wordmark()
-                        .frame(height: 18)
+                    Wordmark(size: 20)
                         .opacity(titleCollapsed ? 1 : 0)
                         .animation(.easeInOut(duration: 0.15), value: titleCollapsed)
                         .accessibilityHidden(!titleCollapsed)
@@ -125,7 +126,9 @@ struct HomeView: View {
             }
             .navigationDestination(for: HomeRoute.self) { route in
                 switch route {
-                case .trip(let id): TripStoryView(tripID: id) { position in picker = .trip(id, position) }
+                case .trip(let id):
+                    TripStoryView(tripID: id) { position in picker = .trip(id, position) }
+                        .navigationTransition(.zoom(sourceID: id, in: albumZoom))
                 case .book(let id): BookView(tripID: id)
                 }
             }
@@ -210,6 +213,7 @@ private struct PickerSheet: View {
 
 struct TripCardsView: View {
     @Environment(TripStore.self) private var store
+    let zoom: Namespace.ID
     @State private var choosingCover: SavedTrip?
     @State private var renaming: SavedTrip?
     @State private var newTitle = ""
@@ -218,13 +222,16 @@ struct TripCardsView: View {
 
     var body: some View {
         VStack {
-            LazyVStack(spacing: 28) {
+            LazyVStack(spacing: CardMetrics.gap) {
                 ForEach(store.trips) { trip in
                     NavigationLink(value: HomeRoute.trip(trip.id)) {
                         SavedTripCard(trip: trip)
+                            .matchedTransitionSource(id: trip.id, in: zoom) { source in
+                                source.clipShape(.rect(cornerRadius: CardMetrics.cornerRadius))
+                            }
                     }
                     .buttonStyle(.plain)
-                    .contentShape(.contextMenuPreview, .rect(cornerRadius: 44))
+                    .contentShape(.contextMenuPreview, .rect(cornerRadius: CardMetrics.cornerRadius))
                     .contextMenu {
                         Button("Edit Title", systemImage: "pencil") {
                             newTitle = trip.title
@@ -245,8 +252,8 @@ struct TripCardsView: View {
                     }
                 }
             }
-            .padding(.horizontal)
-            .padding(.top, 8)
+            .padding(.horizontal, CardMetrics.gap)
+            .padding(.top, 4)
             .padding(.bottom, 40)
         }
         .canvas()
@@ -323,44 +330,8 @@ private struct SavedTripCard: View {
     let trip: SavedTrip
 
     var body: some View {
-        let cover = store.cover(for: trip, curator: curator)
-        ZStack(alignment: .bottomLeading) {
-            if let cover {
-                AssetImage(asset: cover.asset)
-                // Progressive blur: a blurred copy of the photo that fades in toward the bottom.
-                AssetImage(asset: cover.asset)
-                    .blur(radius: 24, opaque: true)
-                    .mask(LinearGradient(
-                        stops: [.init(color: .clear, location: 0.52), .init(color: .black, location: 0.72)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
-            } else {
-                Rectangle().fill(.quaternary)
-            }
-            LinearGradient(
-                stops: [.init(color: .clear, location: 0.5), .init(color: .black.opacity(0.4), location: 1)],
-                startPoint: .top, endPoint: .bottom
-            )
-            VStack(alignment: .leading, spacing: 2) {
-                Text(trip.month)
-                    .dateTracking(.caption)
-                    .font(.text(.caption))
-                    .opacity(0.6)
-                Text(trip.title)
-                    .font(.albumTitle(.title))
-                Text(trip.subtitle)
-                    .font(.text(.subheadline))
-                    .opacity(0.75)
-                    .lineLimit(1)
-            }
-            .foregroundStyle(Color.paper)
-            .padding(.horizontal, 28)
-            .padding(.bottom, 32)
+        PhotoCard(cover: store.cover(for: trip, curator: curator)?.asset, title: trip.title) {
+            Text(cardDetail([trip.month, trip.subtitle.replacingOccurrences(of: "\u{2022}", with: "\u{00B7}")]))
         }
-        .aspectRatio(6 / 7, contentMode: .fit)
-        .clipShape(.rect(cornerRadius: 44))
-        .contentShape(.rect(cornerRadius: 44))
-        .shadow(color: .black.opacity(0.2), radius: 20, y: 12)
-        .accessibilityElement(children: .combine)
     }
 }
